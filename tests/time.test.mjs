@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   START_DATE,
   TIME_ZONE,
+  anniversaryState,
   daysTogether,
   millisecondsUntilNextPontianakMidnight,
 } from "../src/time.mjs";
@@ -35,4 +36,33 @@ test("calculates the exact delay to the next Pontianak midnight", () => {
 
 test("rejects invalid dates", () => {
   assert.throws(() => daysTogether(new Date("invalid")), TypeError);
+});
+
+test("reports the day before, day of, and day after the anniversary", () => {
+  assert.deepEqual(
+    anniversaryState(new Date("2026-07-06T05:00:00.000Z")),
+    { isAnniversary: false, daysUntilNext: 1 },
+  );
+  assert.deepEqual(
+    anniversaryState(new Date("2026-07-07T05:00:00.000Z")),
+    { isAnniversary: true, daysUntilNext: 0 },
+  );
+  assert.deepEqual(
+    anniversaryState(new Date("2026-07-08T05:00:00.000Z")),
+    { isAnniversary: false, daysUntilNext: 364 },
+  );
+});
+
+test("counts across a leap day when targeting the next anniversary", () => {
+  assert.deepEqual(
+    anniversaryState(new Date("2027-07-08T05:00:00.000Z")),
+    { isAnniversary: false, daysUntilNext: 365 },
+  );
+});
+
+test("anniversary state rejects invalid dates", () => {
+  assert.throws(
+    () => anniversaryState(new Date("invalid")),
+    TypeError,
+  );
 });

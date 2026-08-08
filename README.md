@@ -7,6 +7,14 @@ since 7 July 2024.
 
 https://whizher.github.io/our-tiny-universe/
 
+## Features
+
+- Separate fictional transmissions for Naufal and Rity
+- Pontianak-based relationship and anniversary counters
+- Reduced-motion-aware orbit and shooting-star effects
+- Native sharing with clipboard/manual fallbacks
+- Privacy-bounded, dependency-free GitHub Pages build
+
 ## Privacy
 
 This public project contains only the names Naufal and Rity, their relationship

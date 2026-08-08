@@ -1,11 +1,46 @@
 import {
+  anniversaryState,
   daysTogether,
   millisecondsUntilNextPontianakMidnight,
 } from "./src/time.mjs";
 import {
   createShootingStarSpecs,
+  pickNextAntiCringe,
   pickNextMessage,
 } from "./src/content.mjs";
+
+const CANONICAL_URL = "https://whizher.github.io/our-tiny-universe/";
+
+export async function shareUniverse({
+  nativeShare,
+  writeClipboard,
+  url = CANONICAL_URL,
+}) {
+  if (nativeShare) {
+    try {
+      await nativeShare({
+        title: "Our Tiny Universe 🌌",
+        text: "Same chaos, more teamwork.",
+        url,
+      });
+      return "shared";
+    } catch (error) {
+      if (error && error.name === "AbortError") {
+        return "cancelled";
+      }
+    }
+  }
+
+  if (writeClipboard) {
+    try {
+      await writeClipboard(url);
+      return "copied";
+    } catch {
+      // Continue to the visible manual-link fallback.
+    }
+  }
+  return "manual";
+}
 
 export function initSite({
   documentRef = document,
@@ -13,45 +48,70 @@ export function initSite({
   random = Math.random,
   schedule = setTimeout,
   cancelSchedule = clearTimeout,
+  nativeShare =
+    typeof navigator !== "undefined" &&
+    typeof navigator.share === "function"
+      ? navigator.share.bind(navigator)
+      : null,
+  writeClipboard =
+    typeof navigator !== "undefined" &&
+    navigator.clipboard &&
+    typeof navigator.clipboard.writeText === "function"
+      ? navigator.clipboard.writeText.bind(navigator.clipboard)
+      : null,
+  reducedMotion = () =>
+    typeof window !== "undefined" &&
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches,
 } = {}) {
   const counter = documentRef.querySelector("[data-days]");
+  const universe = documentRef.querySelector("[data-universe]");
+  const anniversaryStatus = documentRef.querySelector(
+    "[data-anniversary-status]",
+  );
+  const messageTitle = documentRef.querySelector("[data-message-title]");
   const message = documentRef.querySelector("[data-message]");
   const antiButton = documentRef.querySelector("[data-anti-cringe]");
   const antiResult = documentRef.querySelector("[data-anti-result]");
+  const shareButton = documentRef.querySelector("[data-share]");
+  const shareStatus = documentRef.querySelector("[data-share-status]");
+  const shareFallback = documentRef.querySelector("[data-share-fallback]");
   const shootingLayer = documentRef.querySelector("[data-shooting-stars]");
   const stars = [...documentRef.querySelectorAll("[data-message-source]")];
 
-  const required = [counter, message, antiButton, antiResult, shootingLayer];
-  if (required.some((element) => !element) || stars.length !== 2) {
+  const required = [
+    counter,
+    universe,
+    anniversaryStatus,
+    messageTitle,
+    message,
+    antiButton,
+    antiResult,
+    shareButton,
+    shareStatus,
+    shareFallback,
+    shootingLayer,
+  ];
+  const sources = stars.map((star) => star.dataset.messageSource).sort();
+  const validSources =
+    sources.length === 2 &&
+    sources[0] === "naufal" &&
+    sources[1] === "rity";
+  if (required.some((element) => !element) || !validSources) {
     throw new Error("Our Tiny Universe markup is incomplete");
   }
 
-  let lastMessageIndex = -1;
+  const lastMessageIndexes = new Map([
+    ["naufal", -1],
+    ["rity", -1],
+  ]);
   let midnightTimer;
   let cleanupTimer;
+  let lastAntiCringeIndex = -1;
+  let anniversaryActive = false;
 
-  function renderCounter() {
-    counter.textContent =
-      "Sudah " + daysTogether(now()) + " hari di orbit yang sama.";
-  }
-
-  function scheduleCounterUpdate() {
-    midnightTimer = schedule(() => {
-      renderCounter();
-      scheduleCounterUpdate();
-    }, millisecondsUntilNextPontianakMidnight(now()) + 50);
-  }
-
-  function revealMessage() {
-    const selection = pickNextMessage(lastMessageIndex, random);
-    lastMessageIndex = selection.index;
-    message.textContent = selection.message;
-  }
-
-  function launchAntiCringe() {
-    antiResult.hidden = false;
-    antiResult.textContent = "Okay, cukup romantisnya.";
-    const particles = createShootingStarSpecs(12, random).map((spec) => {
+  function renderShootingStars(count) {
+    const particles = createShootingStarSpecs(count, random).map((spec) => {
       const particle = documentRef.createElement("span");
       particle.className = "shooting-star";
       particle.style.setProperty("--left", spec.left + "%");
@@ -64,10 +124,74 @@ export function initSite({
     cleanupTimer = schedule(() => shootingLayer.replaceChildren(), 2_000);
   }
 
-  renderCounter();
+  function renderTemporalState() {
+    const current = now();
+    counter.textContent =
+      "Sudah " + daysTogether(current) + " hari di orbit yang sama.";
+    const state = anniversaryState(current);
+    universe.dataset.anniversary = String(state.isAnniversary);
+    anniversaryStatus.textContent = state.isAnniversary
+      ? "Orbit anniversary unlocked ✨"
+      : state.daysUntilNext + " hari menuju orbit anniversary berikutnya.";
+
+    if (state.isAnniversary && !anniversaryActive && !reducedMotion()) {
+      renderShootingStars(18);
+    }
+    anniversaryActive = state.isAnniversary;
+  }
+
+  function scheduleCounterUpdate() {
+    midnightTimer = schedule(() => {
+      renderTemporalState();
+      scheduleCounterUpdate();
+    }, millisecondsUntilNextPontianakMidnight(now()) + 50);
+  }
+
+  function revealMessage(event) {
+    const source = event.currentTarget.dataset.messageSource;
+    const selection = pickNextMessage(
+      source,
+      lastMessageIndexes.get(source),
+      random,
+    );
+    lastMessageIndexes.set(source, selection.index);
+    messageTitle.textContent =
+      "Transmission from " +
+      source.charAt(0).toUpperCase() +
+      source.slice(1) +
+      " ✨";
+    message.textContent = selection.message;
+    message.classList.remove("message--reveal");
+    void message.offsetWidth;
+    message.classList.add("message--reveal");
+  }
+
+  function launchAntiCringe() {
+    const selection = pickNextAntiCringe(lastAntiCringeIndex, random);
+    lastAntiCringeIndex = selection.index;
+    antiResult.hidden = false;
+    antiResult.textContent = selection.message;
+    renderShootingStars(12);
+  }
+
+  async function launchShare() {
+    shareStatus.hidden = true;
+    shareStatus.textContent = "";
+    shareFallback.hidden = true;
+    const outcome = await shareUniverse({ nativeShare, writeClipboard });
+    if (outcome === "copied") {
+      shareStatus.textContent = "Link copied ✨";
+      shareStatus.hidden = false;
+    } else if (outcome === "manual") {
+      shareFallback.hidden = false;
+    }
+  }
+
+  renderTemporalState();
   scheduleCounterUpdate();
   stars.forEach((star) => star.addEventListener("click", revealMessage));
   antiButton.addEventListener("click", launchAntiCringe);
+  shareButton.addEventListener("click", launchShare);
 
   return {
     destroy() {
@@ -75,6 +199,7 @@ export function initSite({
         star.removeEventListener("click", revealMessage),
       );
       antiButton.removeEventListener("click", launchAntiCringe);
+      shareButton.removeEventListener("click", launchShare);
       cancelSchedule(midnightTimer);
       cancelSchedule(cleanupTimer);
       shootingLayer.replaceChildren();
