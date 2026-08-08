@@ -126,6 +126,14 @@ button:focus-visible {
   font-weight: 700;
 }
 
+.anniversary-status {
+  min-height: 1.5em;
+  margin: 0.35rem 0 0;
+  color: var(--gold);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
 .orbit-scene {
   position: relative;
   width: min(100%, 35rem);
@@ -157,6 +165,14 @@ button:focus-visible {
   border-radius: 50%;
   transform: translate(-50%, -50%);
   box-shadow: 0 0 2.4rem rgba(255, 143, 184, 0.64);
+}
+
+[data-anniversary="true"] .center-glow {
+  color: var(--gold);
+  background: rgba(255, 213, 106, 0.18);
+  box-shadow:
+    0 0 2.8rem rgba(255, 213, 106, 0.76),
+    0 0 4.5rem rgba(255, 143, 184, 0.32);
 }
 
 .character-star {
@@ -229,7 +245,8 @@ button:focus-visible {
 
 .message-card,
 .timeline,
-.anti-cringe {
+.anti-cringe,
+.share {
   padding: 1.25rem;
   background: var(--panel);
   border: 1px solid var(--border);
@@ -252,6 +269,10 @@ button:focus-visible {
   min-height: 3em;
   margin: 0;
   color: var(--muted);
+}
+
+.message--reveal {
+  animation: message-reveal 180ms ease-out;
 }
 
 .timeline {
@@ -328,6 +349,38 @@ button:focus-visible {
   font-weight: 800;
 }
 
+.share {
+  max-width: 30rem;
+  margin: 1rem auto 0;
+}
+
+.share button {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0.8rem 1.1rem;
+  color: var(--ink);
+  font-weight: 800;
+  background: rgba(188, 156, 255, 0.14);
+  border: 1px solid rgba(188, 156, 255, 0.48);
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.share button:hover {
+  background: rgba(188, 156, 255, 0.24);
+}
+
+.share p,
+.share a {
+  display: block;
+  margin: 0.85rem 0 0;
+  color: var(--gold);
+}
+
+.share [hidden] {
+  display: none;
+}
+
 .shooting-star-layer {
   position: fixed;
   inset: 0;
@@ -380,6 +433,18 @@ button:focus-visible {
   to {
     opacity: 0;
     translate: -45vw 85vh;
+  }
+}
+
+@keyframes message-reveal {
+  from {
+    opacity: 0.35;
+    scale: 0.985;
+  }
+
+  to {
+    opacity: 1;
+    scale: 1;
   }
 }
 

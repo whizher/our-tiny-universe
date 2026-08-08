@@ -38,6 +38,19 @@ export function daysTogether(date = new Date()) {
   return Math.max(0, elapsed);
 }
 
+export function anniversaryState(date = new Date()) {
+  const current = pontianakParts(date);
+  const isAnniversary = current.month === 7 && current.day === 7;
+  const nextYear =
+    current.month < 7 || (current.month === 7 && current.day <= 7)
+      ? current.year
+      : current.year + 1;
+  const daysUntilNext =
+    calendarOrdinal({ year: nextYear, month: 7, day: 7 }) -
+    calendarOrdinal(current);
+  return { isAnniversary, daysUntilNext };
+}
+
 export function millisecondsUntilNextPontianakMidnight(date = new Date()) {
   const { year, month, day } = pontianakParts(date);
   const nextMidnightUtc =
