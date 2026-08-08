@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#080d27">
+    <meta
+      name="description"
+      content="A tiny playful universe for Naufal and Rity."
+    >
+    <title>Our Tiny Universe — Naufal + Rity</title>
+    <link rel="stylesheet" href="styles.css">
+    <script type="module" src="script.js"></script>
+  </head>
+  <body>
+    <main class="universe">
+      <header class="hero">
+        <p class="eyebrow">Naufal + Rity</p>
+        <h1>Our Tiny Universe</h1>
+        <p class="subtitle">Satu orbit sejak 7 Juli 2024.</p>
+        <p class="counter" data-days>Sejak 7 Juli 2024</p>
+      </header>
+
+      <section class="orbit-scene" aria-labelledby="orbit-title">
+        <h2 class="sr-only" id="orbit-title">Two interactive stars</h2>
+        <div class="orbit-ring" aria-hidden="true"></div>
+        <div class="center-glow" aria-hidden="true">♥</div>
+
+        <button
+          class="character-star character-star--naufal"
+          type="button"
+          data-message-source
+          aria-label="Tap Naufal's star"
+        >
+          <svg viewBox="0 0 120 120" aria-hidden="true">
+            <path d="M60 7 75 39 110 43 84 67 91 102 60 85 29 102 36 67 10 43 45 39Z"></path>
+            <circle cx="46" cy="56" r="4"></circle>
+            <circle cx="74" cy="56" r="4"></circle>
+            <path class="star-smile" d="M45 69 Q60 82 75 69"></path>
+          </svg>
+          <span>Naufal</span>
+        </button>
+
+        <button
+          class="character-star character-star--rity"
+          type="button"
+          data-message-source
+          aria-label="Tap Rity's star"
+        >
+          <svg viewBox="0 0 120 120" aria-hidden="true">
+            <path d="M60 7 75 39 110 43 84 67 91 102 60 85 29 102 36 67 10 43 45 39Z"></path>
+            <circle cx="46" cy="56" r="4"></circle>
+            <circle cx="74" cy="56" r="4"></circle>
+            <path class="star-smile" d="M45 69 Q60 82 75 69"></path>
+          </svg>
+          <span>Rity</span>
+        </button>
+
+        <div
+          class="shooting-star-layer"
+          data-shooting-stars
+          aria-hidden="true"
+        ></div>
+      </section>
+
+      <section class="message-card" aria-labelledby="message-title">
+        <h2 id="message-title">Tap a star ✨</h2>
+        <p data-message aria-live="polite">
+          Status hubungan: stable, dengan sedikit chaos.
+        </p>
+      </section>
+
+      <section class="timeline" aria-labelledby="timeline-title">
+        <h2 id="timeline-title">Tiny constellation</h2>
+        <ol>
+          <li>
+            <span>7 Juli 2024</span>
+            <strong>Mulai satu orbit</strong>
+          </li>
+          <li>
+            <span>Today</span>
+            <strong>Still here, somehow</strong>
+          </li>
+          <li>
+            <span>Future</span>
+            <strong>To be continued…</strong>
+          </li>
+        </ol>
+      </section>
+
+      <section class="anti-cringe" aria-label="Anti-cringe control">
+        <button type="button" data-anti-cringe>Emergency Anti-Cringe</button>
+        <p data-anti-result hidden aria-live="polite">
+          Okay, cukup romantisnya.
+        </p>
+      </section>
+    </main>
+  </body>
+</html>

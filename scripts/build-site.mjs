@@ -1,0 +1,15 @@
+import { cp, mkdir, rm, writeFile } from "node:fs/promises";
+
+await rm("_site", { recursive: true, force: true });
+await mkdir("_site/src", { recursive: true });
+
+for (const file of ["index.html", "styles.css", "script.js"]) {
+  await cp(file, "_site/" + file);
+}
+
+for (const file of ["time.mjs", "content.mjs"]) {
+  await cp("src/" + file, "_site/src/" + file);
+}
+
+await writeFile("_site/.nojekyll", "");
+console.log("Built _site with privacy-bounded public assets.");
