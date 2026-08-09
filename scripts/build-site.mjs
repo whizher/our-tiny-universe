@@ -8,11 +8,15 @@ for (const file of ["index.html", "styles.css", "script.js"]) {
   await cp(file, "_site/" + file);
 }
 
-for (const file of ["time.mjs", "content.mjs"]) {
+for (const file of ["time.mjs", "content.mjs", "audio.mjs"]) {
   await cp("src/" + file, "_site/src/" + file);
 }
 
 await cp("assets/favicon.svg", "_site/assets/favicon.svg");
+await cp(
+  "assets/lunar-drive.opus",
+  "_site/assets/lunar-drive.opus",
+);
 await cp(
   "assets/social-preview.png",
   "_site/assets/social-preview.png",
