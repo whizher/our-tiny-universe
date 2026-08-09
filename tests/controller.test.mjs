@@ -1,16 +1,22 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { initSite } from "../script.js";
+import { initSite as initProductionSite } from "../script.js";
 
 class FakeElement {
   constructor() {
     this.children = [];
     this.dataset = {};
+    this.attributes = new Map();
     this.hidden = false;
     this.listeners = new Map();
     this.style = { setProperty() {} };
     this.textContent = "";
     this.offsetWidth = 1;
+    this.currentTime = 0;
+    this.duration = 20;
+    this.paused = true;
+    this.volume = 1;
+    this.playWaits = [];
     this.classes = new Set();
     this.classList = {
       add: (...names) => names.forEach((name) => this.classes.add(name)),
@@ -32,12 +38,34 @@ class FakeElement {
     );
   }
 
+  setAttribute(name, value) {
+    this.attributes.set(name, String(value));
+  }
+
+  getAttribute(name) {
+    return this.attributes.get(name) ?? null;
+  }
+
   async click() {
     await Promise.all(
       (this.listeners.get("click") || []).map((listener) =>
         listener({ currentTarget: this }),
       ),
     );
+  }
+
+  emit(type) {
+    for (const listener of this.listeners.get(type) || []) listener();
+  }
+
+  async play() {
+    const wait = this.playWaits.shift();
+    if (wait) await wait;
+    this.paused = false;
+  }
+
+  pause() {
+    this.paused = true;
   }
 
   append(...children) {
@@ -47,6 +75,48 @@ class FakeElement {
   replaceChildren(...children) {
     this.children = [...children];
   }
+}
+
+function createSoundtrackFake() {
+  let state = "idle";
+  let notify = () => {};
+  let destroyed = false;
+  return {
+    factory({ channels, onStateChange }) {
+      assert.equal(channels.length, 2);
+      notify = onStateChange;
+      onStateChange(state);
+      return {
+        destroy() {
+          destroyed = true;
+          state = "destroyed";
+        },
+        getState: () => state,
+        pause() {
+          state = "paused";
+          notify(state);
+        },
+        async play() {
+          state = "playing";
+          notify(state);
+          return true;
+        },
+      };
+    },
+    fail() {
+      state = "error";
+      notify(state);
+    },
+    getState: () => state,
+    wasDestroyed: () => destroyed,
+  };
+}
+
+function initSite(options) {
+  return initProductionSite({
+    createSoundtrack: createSoundtrackFake().factory,
+    ...options,
+  });
 }
 
 function createFixture() {
@@ -62,6 +132,9 @@ function createFixture() {
     shareStatus: new FakeElement(),
     shareFallback: new FakeElement(),
     layer: new FakeElement(),
+    musicButton: new FakeElement(),
+    musicStatus: new FakeElement(),
+    audioChannels: [new FakeElement(), new FakeElement()],
     stars: [new FakeElement(), new FakeElement()],
   };
   elements.stars[0].dataset.messageSource = "naufal";
@@ -80,15 +153,184 @@ function createFixture() {
     ["[data-share-status]", elements.shareStatus],
     ["[data-share-fallback]", elements.shareFallback],
     ["[data-shooting-stars]", elements.layer],
+    ["[data-music-toggle]", elements.musicButton],
+    ["[data-music-status]", elements.musicStatus],
   ]);
   const documentRef = {
     querySelector: (selector) => selectors.get(selector) || null,
     querySelectorAll: (selector) =>
-      selector === "[data-message-source]" ? elements.stars : [],
+      selector === "[data-message-source]"
+        ? elements.stars
+        : selector === "[data-soundtrack-channel]"
+          ? elements.audioChannels
+          : [],
     createElement: () => new FakeElement(),
   };
   return { documentRef, elements };
 }
+
+test("renders the initial soundtrack control state", () => {
+  const { documentRef, elements } = createFixture();
+  initSite({
+    documentRef,
+    schedule: () => 1,
+    cancelSchedule: () => {},
+  });
+
+  assert.equal(elements.musicButton.textContent, "🎵 Play soundtrack");
+  assert.equal(elements.musicButton.getAttribute("aria-pressed"), "false");
+  assert.equal(
+    elements.musicStatus.textContent,
+    "Tap 🎵 to start Lunar Drive.",
+  );
+});
+
+test("plays, pauses, and resumes the soundtrack through the visible control", async () => {
+  const soundtrack = createSoundtrackFake();
+  const { documentRef, elements } = createFixture();
+  initSite({
+    documentRef,
+    createSoundtrack: soundtrack.factory,
+    schedule: () => 1,
+    cancelSchedule: () => {},
+  });
+
+  await elements.musicButton.click();
+  assert.equal(elements.musicButton.textContent, "⏸ Pause soundtrack");
+  assert.equal(elements.musicButton.getAttribute("aria-pressed"), "true");
+  assert.equal(elements.musicStatus.textContent, "Lunar Drive — Mondo Loops");
+
+  await elements.musicButton.click();
+  assert.equal(elements.musicButton.textContent, "▶ Resume soundtrack");
+  assert.equal(elements.musicButton.getAttribute("aria-pressed"), "false");
+  assert.equal(
+    elements.musicStatus.textContent,
+    "Lunar Drive — Mondo Loops · Paused",
+  );
+
+  await elements.musicButton.click();
+  assert.equal(elements.musicButton.textContent, "⏸ Pause soundtrack");
+  assert.equal(elements.musicButton.getAttribute("aria-pressed"), "true");
+});
+
+test("keeps Pause available while soundtrack resume is pending", async () => {
+  const { documentRef, elements } = createFixture();
+  initProductionSite({
+    documentRef,
+    schedule: () => 1,
+    cancelSchedule: () => {},
+  });
+
+  await elements.musicButton.click();
+  await elements.musicButton.click();
+  let rejectResume;
+  elements.audioChannels[0].playWaits.push(new Promise((_, reject) => {
+    rejectResume = reject;
+  }));
+
+  const resumeClick = elements.musicButton.click();
+  assert.equal(elements.musicButton.textContent, "⏸ Pause soundtrack");
+  assert.equal(elements.musicButton.getAttribute("aria-pressed"), "true");
+  assert.equal(elements.musicStatus.textContent, "Lunar Drive — Mondo Loops");
+
+  await elements.musicButton.click();
+  const abortError = new Error("resume interrupted by Pause");
+  abortError.name = "AbortError";
+  rejectResume(abortError);
+  await resumeClick;
+
+  assert.equal(elements.musicButton.textContent, "▶ Resume soundtrack");
+  assert.equal(elements.musicButton.getAttribute("aria-pressed"), "false");
+  assert.equal(
+    elements.musicStatus.textContent,
+    "Lunar Drive — Mondo Loops · Paused",
+  );
+  assert.ok(elements.audioChannels.every((channel) => channel.paused));
+});
+
+test("reflects an external active-channel pause through the visible control", async () => {
+  const { documentRef, elements } = createFixture();
+  initProductionSite({
+    documentRef,
+    schedule: () => 1,
+    cancelSchedule: () => {},
+  });
+
+  await elements.musicButton.click();
+  elements.audioChannels[0].paused = true;
+  elements.audioChannels[0].emit("pause");
+
+  assert.equal(elements.musicButton.textContent, "▶ Resume soundtrack");
+  assert.equal(elements.musicButton.getAttribute("aria-pressed"), "false");
+  assert.equal(
+    elements.musicStatus.textContent,
+    "Lunar Drive — Mondo Loops · Paused",
+  );
+  assert.ok(elements.audioChannels.every((channel) => channel.paused));
+});
+
+test("reflects a fatal media error through the visible control", async () => {
+  const { documentRef, elements } = createFixture();
+  initProductionSite({
+    documentRef,
+    schedule: () => 1,
+    cancelSchedule: () => {},
+  });
+
+  await elements.musicButton.click();
+  elements.audioChannels[0].emit("error");
+
+  assert.equal(elements.musicButton.textContent, "🎵 Try soundtrack again");
+  assert.equal(elements.musicButton.getAttribute("aria-pressed"), "false");
+  assert.equal(
+    elements.musicStatus.textContent,
+    "Lunar Drive couldn’t start. Tap to try again.",
+  );
+  assert.ok(elements.audioChannels.every((channel) => channel.paused));
+  assert.ok(
+    elements.audioChannels.every((channel) => channel.currentTime === 0),
+  );
+});
+
+test("offers retry copy after an error and retries playback", async () => {
+  const soundtrack = createSoundtrackFake();
+  const { documentRef, elements } = createFixture();
+  initSite({
+    documentRef,
+    createSoundtrack: soundtrack.factory,
+    schedule: () => 1,
+    cancelSchedule: () => {},
+  });
+
+  soundtrack.fail();
+  assert.equal(elements.musicButton.textContent, "🎵 Try soundtrack again");
+  assert.equal(elements.musicButton.getAttribute("aria-pressed"), "false");
+  assert.equal(
+    elements.musicStatus.textContent,
+    "Lunar Drive couldn’t start. Tap to try again.",
+  );
+
+  await elements.musicButton.click();
+  assert.equal(elements.musicButton.textContent, "⏸ Pause soundtrack");
+  assert.equal(elements.musicButton.getAttribute("aria-pressed"), "true");
+});
+
+test("destroy tears down the soundtrack and removes its control listener", async () => {
+  const soundtrack = createSoundtrackFake();
+  const { documentRef, elements } = createFixture();
+  const site = initSite({
+    documentRef,
+    createSoundtrack: soundtrack.factory,
+    schedule: () => 1,
+    cancelSchedule: () => {},
+  });
+
+  site.destroy();
+  assert.equal(soundtrack.wasDestroyed(), true);
+  assert.equal(soundtrack.getState(), "destroyed");
+  await elements.musicButton.click();
+  assert.equal(soundtrack.getState(), "destroyed");
+});
 
 test("renders the Pontianak day counter", () => {
   const { documentRef, elements } = createFixture();

@@ -27,6 +27,7 @@ html {
 body {
   min-height: 100vh;
   margin: 0;
+  padding-bottom: calc(7rem + env(safe-area-inset-bottom, 0px));
   color: var(--ink);
   background:
     radial-gradient(
@@ -73,6 +74,46 @@ button {
 button:focus-visible {
   outline: 3px solid #ffffff;
   outline-offset: 4px;
+}
+
+.music-player {
+  position: fixed;
+  right: max(0.75rem, env(safe-area-inset-right, 0px));
+  bottom: max(0.75rem, env(safe-area-inset-bottom, 0px));
+  z-index: 20;
+  display: grid;
+  gap: 0.55rem;
+  width: min(19rem, calc(100vw - 1.5rem));
+  padding: 0.75rem;
+  text-align: left;
+  background: rgba(8, 13, 39, 0.94);
+  border: 1px solid rgba(188, 156, 255, 0.52);
+  border-radius: 1rem;
+  box-shadow: 0 1rem 2.5rem rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(12px);
+}
+
+.music-player__status {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+
+.music-player__toggle {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0.7rem 0.9rem;
+  color: var(--ink);
+  font-weight: 800;
+  background: rgba(188, 156, 255, 0.16);
+  border: 1px solid rgba(188, 156, 255, 0.52);
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.music-player__toggle:hover {
+  background: rgba(188, 156, 255, 0.28);
 }
 
 .sr-only {

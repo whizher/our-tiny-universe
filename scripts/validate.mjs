@@ -1,4 +1,5 @@
 import { execFile } from "node:child_process";
+import { createHash } from "node:crypto";
 import { access, lstat, readFile } from "node:fs/promises";
 import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -8,6 +9,10 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const execFileAsync = promisify(execFile);
 const MAX_TEXT_BYTES = 256 * 1024;
 const MAX_PREVIEW_BYTES = 1024 * 1024;
+const MAX_SOUNDTRACK_BYTES = 4 * 1024 * 1024;
+const SOUNDTRACK_PATH = "assets/lunar-drive.opus";
+const SOUNDTRACK_SHA256 =
+  "ba8d55ed26addb68ea68ca4703b96aeee665d429981495db3aee272e04081765";
 const APPROVED_EXACT_PATHS = new Set([
   ".github/workflows/pages.yml",
   ".gitignore",
@@ -18,19 +23,22 @@ const APPROVED_EXACT_PATHS = new Set([
   "script.js",
   "scripts/build-site.mjs",
   "scripts/validate.mjs",
+  "src/audio.mjs",
   "src/content.mjs",
   "src/time.mjs",
+  "tests/audio.test.mjs",
   "tests/build.test.mjs",
   "tests/content.test.mjs",
   "tests/controller.test.mjs",
   "tests/time.test.mjs",
+  "assets/lunar-drive.opus",
   "assets/social-preview.png",
   "assets/favicon.svg",
 ]);
 const APPROVED_DOC =
   /^docs\/superpowers\/(?:specs|plans)\/\d{4}-\d{2}-\d{2}-[a-z0-9-]+\.md$/;
 const DENIED_EXTENSION =
-  /\.(?:txt|log|csv|tsv|zip|7z|rar|tar|gz|pdf|doc|docx|xls|xlsx|ppt|pptx|jpg|jpeg|webp|gif|heic|mp3|m4a|wav|ogg|mp4|mov|mkv|webm)$/i;
+  /\.(?:txt|log|csv|tsv|zip|7z|rar|tar|gz|pdf|doc|docx|xls|xlsx|ppt|pptx|jpg|jpeg|webp|gif|heic|mp3|m4a|wav|ogg|opus|mp4|mov|mkv|webm)$/i;
 const CANONICAL_URL =
   "https://whizher.github.io/our-tiny-universe/";
 const PREVIEW_URL = CANONICAL_URL + "assets/social-preview.png";
@@ -61,9 +69,11 @@ const NETWORK_API_NAMES = new Set([
 ]);
 const DEPLOYED_SOURCE_PATHS = new Set([
   "assets/favicon.svg",
+  "assets/lunar-drive.opus",
   "assets/social-preview.png",
   "index.html",
   "script.js",
+  "src/audio.mjs",
   "src/content.mjs",
   "src/time.mjs",
   "styles.css",
@@ -74,6 +84,7 @@ const required = [
   "script.js",
   "src/time.mjs",
   "src/content.mjs",
+  "src/audio.mjs",
   "assets/favicon.svg",
 ];
 
@@ -90,17 +101,34 @@ export function validateTrackedEntries(entries) {
       errors.push("Tracked path is not a regular file: " + entry.path);
       continue;
     }
-    if (DENIED_EXTENSION.test(entry.path)) {
+    if (DENIED_EXTENSION.test(entry.path) && entry.path !== SOUNDTRACK_PATH) {
       errors.push("Forbidden tracked file type: " + entry.path);
       continue;
     }
     const limit =
-      entry.path === "assets/social-preview.png"
+      entry.path === SOUNDTRACK_PATH
+        ? MAX_SOUNDTRACK_BYTES
+        : entry.path === "assets/social-preview.png"
         ? MAX_PREVIEW_BYTES
         : MAX_TEXT_BYTES;
     if (entry.size > limit) {
       errors.push("Tracked file exceeds size limit: " + entry.path);
     }
+  }
+  return errors;
+}
+
+export function validateSoundtrack(bytes) {
+  const errors = [];
+  if (bytes.length > MAX_SOUNDTRACK_BYTES) {
+    errors.push("Soundtrack exceeds size limit");
+  }
+  if (Buffer.from(bytes.subarray(0, 4)).toString("ascii") !== "OggS") {
+    errors.push("Soundtrack is not an Ogg/Opus container");
+  }
+  const digest = createHash("sha256").update(bytes).digest("hex");
+  if (digest !== SOUNDTRACK_SHA256) {
+    errors.push("Soundtrack SHA-256 mismatch");
   }
   return errors;
 }
@@ -662,6 +690,13 @@ async function main() {
     }
   }
 
+  try {
+    const soundtrack = await readFile(resolve(root, SOUNDTRACK_PATH));
+    errors.push(...validateSoundtrack(soundtrack));
+  } catch {
+    errors.push("Missing required file: " + SOUNDTRACK_PATH);
+  }
+
   const references = extractHtmlReferences(
     contents.get("index.html") || "",
     errors,
@@ -729,7 +764,7 @@ async function main() {
     process.exit(1);
   }
 
-  console.log("Validated " + required.length + " runtime files.");
+  console.log("Validated " + (required.length + 1) + " runtime files.");
 }
 
 const isMain =

@@ -8,6 +8,7 @@ import {
   pickNextAntiCringe,
   pickNextMessage,
 } from "./src/content.mjs";
+import { createCrossfadeController } from "./src/audio.mjs";
 
 const CANONICAL_URL = "https://whizher.github.io/our-tiny-universe/";
 
@@ -63,6 +64,7 @@ export function initSite({
     typeof window !== "undefined" &&
     typeof window.matchMedia === "function" &&
     window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+  createSoundtrack = createCrossfadeController,
 } = {}) {
   const counter = documentRef.querySelector("[data-days]");
   const universe = documentRef.querySelector("[data-universe]");
@@ -78,6 +80,11 @@ export function initSite({
   const shareFallback = documentRef.querySelector("[data-share-fallback]");
   const shootingLayer = documentRef.querySelector("[data-shooting-stars]");
   const stars = [...documentRef.querySelectorAll("[data-message-source]")];
+  const musicButton = documentRef.querySelector("[data-music-toggle]");
+  const musicStatus = documentRef.querySelector("[data-music-status]");
+  const audioChannels = [
+    ...documentRef.querySelectorAll("[data-soundtrack-channel]"),
+  ];
 
   const required = [
     counter,
@@ -97,7 +104,14 @@ export function initSite({
     sources.length === 2 &&
     sources[0] === "naufal" &&
     sources[1] === "rity";
-  if (required.some((element) => !element) || !validSources) {
+  const validAudioChannels = audioChannels.length === 2;
+  if (
+    required.some((element) => !element) ||
+    !validSources ||
+    !musicButton ||
+    !musicStatus ||
+    !validAudioChannels
+  ) {
     throw new Error("Our Tiny Universe markup is incomplete");
   }
 
@@ -187,11 +201,66 @@ export function initSite({
     }
   }
 
+  function renderMusicState(state) {
+    const views = {
+      idle: {
+        label: "🎵 Play soundtrack",
+        pressed: "false",
+        status: "Tap 🎵 to start Lunar Drive.",
+      },
+      starting: {
+        label: "⏸ Pause soundtrack",
+        pressed: "true",
+        status: "Tap 🎵 to start Lunar Drive.",
+      },
+      playing: {
+        label: "⏸ Pause soundtrack",
+        pressed: "true",
+        status: "Lunar Drive — Mondo Loops",
+      },
+      resuming: {
+        label: "⏸ Pause soundtrack",
+        pressed: "true",
+        status: "Lunar Drive — Mondo Loops",
+      },
+      paused: {
+        label: "▶ Resume soundtrack",
+        pressed: "false",
+        status: "Lunar Drive — Mondo Loops · Paused",
+      },
+      error: {
+        label: "🎵 Try soundtrack again",
+        pressed: "false",
+        status: "Lunar Drive couldn’t start. Tap to try again.",
+      },
+    };
+    const view = views[state];
+    if (!view) return;
+    musicButton.textContent = view.label;
+    musicButton.setAttribute("aria-pressed", view.pressed);
+    musicStatus.textContent = view.status;
+  }
+
+  const soundtrack = createSoundtrack({
+    channels: audioChannels,
+    onStateChange: renderMusicState,
+  });
+  renderMusicState(soundtrack.getState());
+
+  async function toggleSoundtrack() {
+    if (["playing", "resuming", "starting"].includes(soundtrack.getState())) {
+      soundtrack.pause();
+    } else {
+      await soundtrack.play();
+    }
+  }
+
   renderTemporalState();
   scheduleCounterUpdate();
   stars.forEach((star) => star.addEventListener("click", revealMessage));
   antiButton.addEventListener("click", launchAntiCringe);
   shareButton.addEventListener("click", launchShare);
+  musicButton.addEventListener("click", toggleSoundtrack);
 
   return {
     destroy() {
@@ -200,6 +269,8 @@ export function initSite({
       );
       antiButton.removeEventListener("click", launchAntiCringe);
       shareButton.removeEventListener("click", launchShare);
+      musicButton.removeEventListener("click", toggleSoundtrack);
+      soundtrack.destroy();
       cancelSchedule(midnightTimer);
       cancelSchedule(cleanupTimer);
       shootingLayer.replaceChildren();

@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import {
   cp,
   mkdir,
@@ -58,8 +59,10 @@ async function validateFixture({
       typeof indexHtml === "function"
         ? await indexHtml({ fixtureRoot, outsidePath })
         : indexHtml;
+    const soundtrackPath = join(assetsDirectory, "lunar-drive.opus");
     await Promise.all([
       cp("assets/favicon.svg", join(assetsDirectory, "favicon.svg")),
+      cp("assets/lunar-drive.opus", soundtrackPath),
       cp("scripts/validate.mjs", join(scriptsDirectory, "validate.mjs")),
       timeSource === undefined
         ? cp("src/time.mjs", join(sourceDirectory, "time.mjs"))
@@ -67,6 +70,7 @@ async function validateFixture({
       contentSource === undefined
         ? cp("src/content.mjs", join(sourceDirectory, "content.mjs"))
         : writeFile(join(sourceDirectory, "content.mjs"), contentSource),
+      cp("src/audio.mjs", join(sourceDirectory, "audio.mjs")),
       writeFile(join(fixtureRoot, "index.html"), fixtureIndex),
       writeFile(join(fixtureRoot, "script.js"), scriptSource),
       writeFile(join(fixtureRoot, "styles.css"), fixtureStyles),
@@ -82,6 +86,7 @@ async function validateFixture({
         indexPath: join(fixtureRoot, "index.html"),
         outsidePath,
         previewPath: join(assetsDirectory, "social-preview.png"),
+        soundtrackPath,
       });
     }
     spawnSync("git", ["init", "--quiet"], { cwd: fixtureRoot });
@@ -105,16 +110,19 @@ test("repository policy permits every exact approved tracked path", () => {
     "script.js",
     "scripts/build-site.mjs",
     "scripts/validate.mjs",
+    "src/audio.mjs",
     "src/content.mjs",
     "src/time.mjs",
+    "tests/audio.test.mjs",
     "tests/build.test.mjs",
     "tests/content.test.mjs",
     "tests/controller.test.mjs",
     "tests/time.test.mjs",
+    "assets/lunar-drive.opus",
     "assets/social-preview.png",
     "assets/favicon.svg",
   ];
-  assert.equal(new Set(approvedPaths).size, 17);
+  assert.equal(new Set(approvedPaths).size, 20);
   assert.deepEqual(
     validateTrackedEntries(approvedPaths.map((path) => ({ path, size: 1 }))),
     [],
@@ -183,6 +191,7 @@ test("repository policy rejects every denied export, media, and archive extensio
     "exports/file.m4a",
     "exports/file.wav",
     "exports/file.ogg",
+    "exports/file.opus",
     "exports/file.mp4",
     "exports/file.mov",
     "exports/file.mkv",
@@ -191,14 +200,15 @@ test("repository policy rejects every denied export, media, and archive extensio
   const errors = validateTrackedEntries(
     deniedPaths.map((path) => ({ path, size: 1 })),
   );
-  assert.equal(deniedPaths.length, 29);
-  assert.equal(errors.length, 29);
+  assert.equal(deniedPaths.length, 30);
+  assert.equal(errors.length, 30);
 });
 
-test("repository policy permits only package.json and the two approved public assets", () => {
+test("repository policy permits only package.json and the three approved public assets", () => {
   assert.deepEqual(
     validateTrackedEntries([
       { path: "package.json", size: 1 },
+      { path: "assets/lunar-drive.opus", size: 2_932_210 },
       { path: "assets/social-preview.png", size: 1 },
       { path: "assets/favicon.svg", size: 1 },
     ]),
@@ -226,11 +236,12 @@ test("repository policy permits only package.json and the two approved public as
   );
 });
 
-test("repository policy enforces exact text and preview byte limits", () => {
+test("repository policy enforces exact text, preview, and soundtrack byte limits", () => {
   assert.deepEqual(
     validateTrackedEntries([
       { path: "script.js", size: 262_144 },
       { path: "assets/social-preview.png", size: 1_048_576 },
+      { path: "assets/lunar-drive.opus", size: 4_194_304 },
     ]),
     [],
   );
@@ -238,12 +249,31 @@ test("repository policy enforces exact text and preview byte limits", () => {
     validateTrackedEntries([
       { path: "script.js", size: 262_145 },
       { path: "assets/social-preview.png", size: 1_048_577 },
+      { path: "assets/lunar-drive.opus", size: 4_194_305 },
     ]),
     [
       "Tracked file exceeds size limit: script.js",
       "Tracked file exceeds size limit: assets/social-preview.png",
+      "Tracked file exceeds size limit: assets/lunar-drive.opus",
     ],
   );
+});
+
+test("soundtrack markup is local, manual, visible, and duplicated for crossfade", async () => {
+  const html = await readFile("index.html", "utf8");
+  const channels = html.match(/<audio\b[^>]*data-soundtrack-channel[^>]*>/g) || [];
+
+  assert.equal(channels.length, 2);
+  for (const channel of channels) {
+    assert.match(channel, /src="assets\/lunar-drive\.opus"/);
+    assert.match(channel, /preload="metadata"/);
+    assert.doesNotMatch(channel, /\b(?:autoplay|loop)\b/i);
+  }
+  assert.match(html, /data-music-toggle/);
+  assert.match(html, /data-music-status[^>]*aria-live="polite"/);
+  assert.match(html, /Tap 🎵 to start Lunar Drive\./);
+  assert.match(html, /🎵 Play soundtrack/);
+  assert.doesNotMatch(html, /(?:youtube|spotify|soundcloud)\.com/i);
 });
 
 test("build emits only privacy-bounded public runtime files", async () => {
@@ -256,13 +286,20 @@ test("build emits only privacy-bounded public runtime files", async () => {
   assert.deepEqual(files, [
     ".nojekyll",
     "assets/favicon.svg",
+    "assets/lunar-drive.opus",
     "assets/social-preview.png",
     "index.html",
     "script.js",
+    "src/audio.mjs",
     "src/content.mjs",
     "src/time.mjs",
     "styles.css",
   ]);
+
+  assert.deepEqual(
+    await readFile("_site/assets/lunar-drive.opus"),
+    await readFile("assets/lunar-drive.opus"),
+  );
 
   const forbidden =
     /WhatsApp|wa\.me|tel:|phone number|private photo|localStorage|analytics/i;
@@ -277,6 +314,24 @@ test("validator permits canonical metadata and local module imports", () => {
     encoding: "utf8",
   });
   assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /Validated 8 runtime files\./);
+});
+
+test("validator rejects a modified soundtrack", async () => {
+  const indexHtml = await readFile("index.html", "utf8");
+  const scriptSource = await readFile("script.js", "utf8");
+  const result = await validateFixture({
+    indexHtml,
+    scriptSource,
+    prepareFixture: async ({ soundtrackPath }) => {
+      const bytes = await readFile(soundtrackPath);
+      bytes[128] ^= 1;
+      await writeFile(soundtrackPath, bytes);
+    },
+  });
+
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /Soundtrack SHA-256 mismatch/);
 });
 
 test("validator rejects canonical URL used as a runtime script", async () => {
@@ -893,6 +948,25 @@ test("social preview has approved dimensions and size", async () => {
   assert.equal(bytes.readUInt32BE(16), 1200);
   assert.equal(bytes.readUInt32BE(20), 630);
   assert.ok(bytes.length <= 1_048_576);
+});
+
+test("soundtrack is the sanitized approved Opus asset", async () => {
+  const bytes = await readFile("assets/lunar-drive.opus");
+  const digest = createHash("sha256").update(bytes).digest("hex");
+  const searchable = bytes.toString("latin1");
+
+  assert.equal(bytes.subarray(0, 4).toString("ascii"), "OggS");
+  assert.equal(bytes.length, 2_932_210);
+  assert.equal(
+    digest,
+    "ba8d55ed26addb68ea68ca4703b96aeee665d429981495db3aee272e04081765",
+  );
+  assert.match(searchable, /title=Lunar Drive/);
+  assert.match(searchable, /artist=Mondo Loops/);
+  assert.doesNotMatch(
+    searchable,
+    /https?:\/\/|youtu(?:\.be|be\.com)|lofi girl|description=|metadata_block_picture/i,
+  );
 });
 
 test("favicon is self-contained and privacy-safe", async () => {
