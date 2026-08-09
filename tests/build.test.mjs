@@ -272,8 +272,46 @@ test("soundtrack markup is local, manual, visible, and duplicated for crossfade"
   assert.match(html, /data-music-toggle/);
   assert.match(html, /data-music-status[^>]*aria-live="polite"/);
   assert.match(html, /Tap 🎵 to start Lunar Drive\./);
-  assert.match(html, /🎵 Play soundtrack/);
+  const toggle = html.match(
+    /<button\b[^>]*data-music-toggle[^>]*>[\s\S]*?<\/button>/,
+  )?.[0] || "";
+  assert.match(toggle, /aria-label="Play soundtrack"/);
+  assert.match(toggle, /aria-pressed="false"/);
+  assert.match(toggle, />\s*🎵\s*<\/button>/);
+  assert.doesNotMatch(toggle, />[^<]*Play soundtrack/);
   assert.doesNotMatch(html, /(?:youtube|spotify|soundcloud)\.com/i);
+});
+
+test("soundtrack control is a compact circle with a separate hint bubble", async () => {
+  const styles = await readFile("styles.css", "utf8");
+  const player = styles.match(/\.music-player\s*\{([^}]*)\}/)?.[1] || "";
+  const status = styles.match(
+    /\.music-player__status\s*\{([^}]*)\}/,
+  )?.[1] || "";
+  const toggle = styles.match(
+    /\.music-player__toggle\s*\{([^}]*)\}/,
+  )?.[1] || "";
+
+  assert.match(player, /justify-items:\s*end;/);
+  assert.match(player, /width:\s*max-content;/);
+  assert.match(player, /max-width:\s*calc\(100vw - 1\.5rem\);/);
+  assert.doesNotMatch(player, /background:\s*rgba/);
+  assert.doesNotMatch(player, /padding:\s*0\.75rem/);
+
+  assert.match(
+    status,
+    /max-width:\s*min\(16rem, calc\(100vw - 1\.5rem\)\);/,
+  );
+  assert.match(status, /padding:\s*0\.55rem 0\.7rem;/);
+  assert.match(status, /background:\s*rgba\(8, 13, 39, 0\.94\);/);
+  assert.match(status, /backdrop-filter:\s*blur\(12px\);/);
+
+  assert.match(toggle, /width:\s*3rem;/);
+  assert.match(toggle, /height:\s*3rem;/);
+  assert.match(toggle, /min-width:\s*3rem;/);
+  assert.match(toggle, /min-height:\s*3rem;/);
+  assert.match(toggle, /padding:\s*0;/);
+  assert.match(toggle, /border-radius:\s*50%;/);
 });
 
 test("build emits only privacy-bounded public runtime files", async () => {

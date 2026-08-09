@@ -169,6 +169,24 @@ function createFixture() {
   return { documentRef, elements };
 }
 
+function assertMusicView(elements, {
+  accessibleLabel,
+  icon,
+  pressed,
+  status,
+}) {
+  assert.equal(elements.musicButton.textContent, icon);
+  assert.equal(
+    elements.musicButton.getAttribute("aria-label"),
+    accessibleLabel,
+  );
+  assert.equal(
+    elements.musicButton.getAttribute("aria-pressed"),
+    pressed,
+  );
+  assert.equal(elements.musicStatus.textContent, status);
+}
+
 test("renders the initial soundtrack control state", () => {
   const { documentRef, elements } = createFixture();
   initSite({
@@ -177,12 +195,42 @@ test("renders the initial soundtrack control state", () => {
     cancelSchedule: () => {},
   });
 
-  assert.equal(elements.musicButton.textContent, "🎵 Play soundtrack");
-  assert.equal(elements.musicButton.getAttribute("aria-pressed"), "false");
-  assert.equal(
-    elements.musicStatus.textContent,
-    "Tap 🎵 to start Lunar Drive.",
+  assertMusicView(elements, {
+    accessibleLabel: "Play soundtrack",
+    icon: "🎵",
+    pressed: "false",
+    status: "Tap 🎵 to start Lunar Drive.",
+  });
+});
+
+test("shows Pause while initial soundtrack playback is pending", async () => {
+  const { documentRef, elements } = createFixture();
+  let releaseStart;
+  elements.audioChannels[0].playWaits.push(
+    new Promise((resolve) => { releaseStart = resolve; }),
   );
+  initProductionSite({
+    documentRef,
+    schedule: () => 1,
+    cancelSchedule: () => {},
+  });
+
+  const startClick = elements.musicButton.click();
+  assertMusicView(elements, {
+    accessibleLabel: "Pause soundtrack",
+    icon: "⏸",
+    pressed: "true",
+    status: "Tap 🎵 to start Lunar Drive.",
+  });
+
+  releaseStart();
+  await startClick;
+  assertMusicView(elements, {
+    accessibleLabel: "Pause soundtrack",
+    icon: "⏸",
+    pressed: "true",
+    status: "Lunar Drive — Mondo Loops",
+  });
 });
 
 test("plays, pauses, and resumes the soundtrack through the visible control", async () => {
@@ -196,21 +244,28 @@ test("plays, pauses, and resumes the soundtrack through the visible control", as
   });
 
   await elements.musicButton.click();
-  assert.equal(elements.musicButton.textContent, "⏸ Pause soundtrack");
-  assert.equal(elements.musicButton.getAttribute("aria-pressed"), "true");
-  assert.equal(elements.musicStatus.textContent, "Lunar Drive — Mondo Loops");
+  assertMusicView(elements, {
+    accessibleLabel: "Pause soundtrack",
+    icon: "⏸",
+    pressed: "true",
+    status: "Lunar Drive — Mondo Loops",
+  });
 
   await elements.musicButton.click();
-  assert.equal(elements.musicButton.textContent, "▶ Resume soundtrack");
-  assert.equal(elements.musicButton.getAttribute("aria-pressed"), "false");
-  assert.equal(
-    elements.musicStatus.textContent,
-    "Lunar Drive — Mondo Loops · Paused",
-  );
+  assertMusicView(elements, {
+    accessibleLabel: "Resume soundtrack",
+    icon: "▶",
+    pressed: "false",
+    status: "Lunar Drive — Mondo Loops · Paused",
+  });
 
   await elements.musicButton.click();
-  assert.equal(elements.musicButton.textContent, "⏸ Pause soundtrack");
-  assert.equal(elements.musicButton.getAttribute("aria-pressed"), "true");
+  assertMusicView(elements, {
+    accessibleLabel: "Pause soundtrack",
+    icon: "⏸",
+    pressed: "true",
+    status: "Lunar Drive — Mondo Loops",
+  });
 });
 
 test("keeps Pause available while soundtrack resume is pending", async () => {
@@ -229,9 +284,12 @@ test("keeps Pause available while soundtrack resume is pending", async () => {
   }));
 
   const resumeClick = elements.musicButton.click();
-  assert.equal(elements.musicButton.textContent, "⏸ Pause soundtrack");
-  assert.equal(elements.musicButton.getAttribute("aria-pressed"), "true");
-  assert.equal(elements.musicStatus.textContent, "Lunar Drive — Mondo Loops");
+  assertMusicView(elements, {
+    accessibleLabel: "Pause soundtrack",
+    icon: "⏸",
+    pressed: "true",
+    status: "Lunar Drive — Mondo Loops",
+  });
 
   await elements.musicButton.click();
   const abortError = new Error("resume interrupted by Pause");
@@ -239,12 +297,12 @@ test("keeps Pause available while soundtrack resume is pending", async () => {
   rejectResume(abortError);
   await resumeClick;
 
-  assert.equal(elements.musicButton.textContent, "▶ Resume soundtrack");
-  assert.equal(elements.musicButton.getAttribute("aria-pressed"), "false");
-  assert.equal(
-    elements.musicStatus.textContent,
-    "Lunar Drive — Mondo Loops · Paused",
-  );
+  assertMusicView(elements, {
+    accessibleLabel: "Resume soundtrack",
+    icon: "▶",
+    pressed: "false",
+    status: "Lunar Drive — Mondo Loops · Paused",
+  });
   assert.ok(elements.audioChannels.every((channel) => channel.paused));
 });
 
@@ -260,12 +318,12 @@ test("reflects an external active-channel pause through the visible control", as
   elements.audioChannels[0].paused = true;
   elements.audioChannels[0].emit("pause");
 
-  assert.equal(elements.musicButton.textContent, "▶ Resume soundtrack");
-  assert.equal(elements.musicButton.getAttribute("aria-pressed"), "false");
-  assert.equal(
-    elements.musicStatus.textContent,
-    "Lunar Drive — Mondo Loops · Paused",
-  );
+  assertMusicView(elements, {
+    accessibleLabel: "Resume soundtrack",
+    icon: "▶",
+    pressed: "false",
+    status: "Lunar Drive — Mondo Loops · Paused",
+  });
   assert.ok(elements.audioChannels.every((channel) => channel.paused));
 });
 
@@ -280,12 +338,12 @@ test("reflects a fatal media error through the visible control", async () => {
   await elements.musicButton.click();
   elements.audioChannels[0].emit("error");
 
-  assert.equal(elements.musicButton.textContent, "🎵 Try soundtrack again");
-  assert.equal(elements.musicButton.getAttribute("aria-pressed"), "false");
-  assert.equal(
-    elements.musicStatus.textContent,
-    "Lunar Drive couldn’t start. Tap to try again.",
-  );
+  assertMusicView(elements, {
+    accessibleLabel: "Retry soundtrack",
+    icon: "↻",
+    pressed: "false",
+    status: "Lunar Drive couldn’t start. Tap to try again.",
+  });
   assert.ok(elements.audioChannels.every((channel) => channel.paused));
   assert.ok(
     elements.audioChannels.every((channel) => channel.currentTime === 0),
@@ -303,16 +361,20 @@ test("offers retry copy after an error and retries playback", async () => {
   });
 
   soundtrack.fail();
-  assert.equal(elements.musicButton.textContent, "🎵 Try soundtrack again");
-  assert.equal(elements.musicButton.getAttribute("aria-pressed"), "false");
-  assert.equal(
-    elements.musicStatus.textContent,
-    "Lunar Drive couldn’t start. Tap to try again.",
-  );
+  assertMusicView(elements, {
+    accessibleLabel: "Retry soundtrack",
+    icon: "↻",
+    pressed: "false",
+    status: "Lunar Drive couldn’t start. Tap to try again.",
+  });
 
   await elements.musicButton.click();
-  assert.equal(elements.musicButton.textContent, "⏸ Pause soundtrack");
-  assert.equal(elements.musicButton.getAttribute("aria-pressed"), "true");
+  assertMusicView(elements, {
+    accessibleLabel: "Pause soundtrack",
+    icon: "⏸",
+    pressed: "true",
+    status: "Lunar Drive — Mondo Loops",
+  });
 });
 
 test("destroy tears down the soundtrack and removes its control listener", async () => {

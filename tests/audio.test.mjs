@@ -86,6 +86,8 @@ function createFrames() {
 
 const flushPlayback = () => new Promise((resolve) => setImmediate(resolve));
 
+const EXPECTED_DEFAULT_TARGET_VOLUME = 0.5;
+
 test("calculates a clamped equal-power crossfade", () => {
   assert.deepEqual(equalPowerVolumes(0, 0.3), {
     outgoing: 0.3,
@@ -100,6 +102,30 @@ test("calculates a clamped equal-power crossfade", () => {
   });
 });
 
+test("uses 50% as the default equal-power target", () => {
+  assert.deepEqual(equalPowerVolumes(0), {
+    outgoing: EXPECTED_DEFAULT_TARGET_VOLUME,
+    incoming: 0,
+  });
+  const halfway = equalPowerVolumes(0.5);
+  assert.ok(
+    Math.abs(
+      halfway.outgoing -
+        Math.SQRT1_2 * EXPECTED_DEFAULT_TARGET_VOLUME
+    ) < 1e-12,
+  );
+  assert.ok(
+    Math.abs(
+      halfway.incoming -
+        Math.SQRT1_2 * EXPECTED_DEFAULT_TARGET_VOLUME
+    ) < 1e-12,
+  );
+  assert.deepEqual(equalPowerVolumes(1), {
+    outgoing: 0,
+    incoming: EXPECTED_DEFAULT_TARGET_VOLUME,
+  });
+});
+
 test("plays, pauses, and resumes only from explicit calls", async () => {
   const channels = [new FakeAudio(), new FakeAudio()];
   const states = [];
@@ -111,7 +137,7 @@ test("plays, pauses, and resumes only from explicit calls", async () => {
   assert.equal(controller.getState(), "idle");
   assert.ok(channels.every((channel) => channel.paused));
   assert.equal(await controller.play(), true);
-  assert.equal(channels[0].volume, 0.3);
+  assert.equal(channels[0].volume, EXPECTED_DEFAULT_TARGET_VOLUME);
   assert.equal(controller.getState(), "playing");
 
   controller.pause();
@@ -224,7 +250,10 @@ test("authorizes both channels inaudibly during the initial play gesture", async
   gestureActive = false;
 
   assert.equal(await playback, true);
-  assert.deepEqual(channels[0].playVolumes, [0.3]);
+  assert.deepEqual(
+    channels[0].playVolumes,
+    [EXPECTED_DEFAULT_TARGET_VOLUME],
+  );
   assert.deepEqual(channels[1].playVolumes, [0]);
   assert.equal(channels[1].paused, true);
   assert.equal(channels[1].currentTime, 0);
@@ -407,10 +436,16 @@ test("crossfades at the loop boundary and swaps channel roles", async () => {
 
   frames.runNext(2_500);
   assert.ok(
-    Math.abs(channels[0].volume - Math.SQRT1_2 * 0.3) < 1e-12,
+    Math.abs(
+      channels[0].volume -
+        Math.SQRT1_2 * EXPECTED_DEFAULT_TARGET_VOLUME
+    ) < 1e-12,
   );
   assert.ok(
-    Math.abs(channels[1].volume - Math.SQRT1_2 * 0.3) < 1e-12,
+    Math.abs(
+      channels[1].volume -
+        Math.SQRT1_2 * EXPECTED_DEFAULT_TARGET_VOLUME
+    ) < 1e-12,
   );
 
   frames.runNext(5_000);
@@ -418,7 +453,7 @@ test("crossfades at the loop boundary and swaps channel roles", async () => {
   assert.equal(channels[0].currentTime, 0);
   assert.equal(channels[0].volume, 0);
   assert.equal(channels[1].paused, false);
-  assert.equal(channels[1].volume, 0.3);
+  assert.equal(channels[1].volume, EXPECTED_DEFAULT_TARGET_VOLUME);
 
   channels[1].currentTime = 15;
   channels[1].emit("timeupdate");
@@ -461,7 +496,7 @@ test("pauses and resumes the remaining portion of an active fade", async () => {
   assert.equal(channels[0].currentTime, 0);
   assert.equal(channels[0].volume, 0);
   assert.equal(channels[1].paused, false);
-  assert.equal(channels[1].volume, 0.3);
+  assert.equal(channels[1].volume, EXPECTED_DEFAULT_TARGET_VOLUME);
   assert.equal(frames.size(), 0);
 });
 
@@ -492,7 +527,7 @@ test("preserves fade time elapsed before Pause without a delivered frame", async
   assert.equal(channels[0].currentTime, 0);
   assert.equal(channels[0].volume, 0);
   assert.equal(channels[1].paused, false);
-  assert.equal(channels[1].volume, 0.3);
+  assert.equal(channels[1].volume, EXPECTED_DEFAULT_TARGET_VOLUME);
   assert.equal(frames.size(), 0);
 });
 
@@ -509,7 +544,7 @@ test("promotes the standby channel when the active channel ends before a fade", 
   assert.equal(channels[0].volume, 0);
   assert.equal(channels[1].currentTime, 0);
   assert.equal(channels[1].paused, false);
-  assert.equal(channels[1].volume, 0.3);
+  assert.equal(channels[1].volume, EXPECTED_DEFAULT_TARGET_VOLUME);
   assert.equal(controller.getState(), "playing");
 });
 
@@ -571,7 +606,7 @@ test("retires stale ended-fallback completion after failure and retry", async ()
 
   assert.equal(controller.getState(), "playing");
   assert.equal(channels[0].paused, false);
-  assert.equal(channels[0].volume, 0.3);
+  assert.equal(channels[0].volume, EXPECTED_DEFAULT_TARGET_VOLUME);
   assert.equal(channels[1].paused, true);
   assert.equal(channels[1].volume, 0);
 });
@@ -592,7 +627,7 @@ test("keeps the ended fallback active when natural end also emits pause", async 
   assert.equal(channels[0].paused, true);
   assert.equal(channels[0].currentTime, 0);
   assert.equal(channels[1].paused, false);
-  assert.equal(channels[1].volume, 0.3);
+  assert.equal(channels[1].volume, EXPECTED_DEFAULT_TARGET_VOLUME);
 });
 
 test("promotes the incoming channel when the outgoing channel ends during a fade", async () => {
@@ -618,7 +653,7 @@ test("promotes the incoming channel when the outgoing channel ends during a fade
   assert.equal(channels[0].currentTime, 0);
   assert.equal(channels[0].volume, 0);
   assert.equal(channels[1].paused, false);
-  assert.equal(channels[1].volume, 0.3);
+  assert.equal(channels[1].volume, EXPECTED_DEFAULT_TARGET_VOLUME);
 });
 
 test("promotes incoming when outgoing ends during pending fade startup", async () => {
@@ -647,7 +682,7 @@ test("promotes incoming when outgoing ends during pending fade startup", async (
   assert.equal(channels[0].currentTime, 0);
   assert.equal(channels[0].volume, 0);
   assert.equal(channels[1].paused, false);
-  assert.equal(channels[1].volume, 0.3);
+  assert.equal(channels[1].volume, EXPECTED_DEFAULT_TARGET_VOLUME);
   assert.equal(frames.size(), 0);
 });
 
@@ -669,7 +704,7 @@ test("recovers from a rejected initial play on a later explicit retry", async ()
   assert.equal(await controller.play(), true);
   assert.equal(controller.getState(), "playing");
   assert.equal(channels[0].currentTime, 0);
-  assert.equal(channels[0].volume, 0.3);
+  assert.equal(channels[0].volume, EXPECTED_DEFAULT_TARGET_VOLUME);
   assert.deepEqual(states, [
     "idle",
     "starting",
@@ -833,7 +868,7 @@ test("retires stale standby completion after playback failure and retry", async 
 
   assert.equal(controller.getState(), "playing");
   assert.equal(channels[0].paused, false);
-  assert.equal(channels[0].volume, 0.3);
+  assert.equal(channels[0].volume, EXPECTED_DEFAULT_TARGET_VOLUME);
   assert.equal(channels[1].paused, true);
   assert.equal(channels[1].volume, 0);
   assert.equal(frames.size(), 0);
@@ -864,7 +899,7 @@ test("retires the originally requested channel after a later role swap", async (
   await flushPlayback();
   channels[0].emit("ended");
   assert.equal(channels[1].paused, false);
-  assert.equal(channels[1].volume, 0.3);
+  assert.equal(channels[1].volume, EXPECTED_DEFAULT_TARGET_VOLUME);
 
   releaseStaleActive();
   assert.equal(await stalePlayback, false);
@@ -874,7 +909,7 @@ test("retires the originally requested channel after a later role swap", async (
   assert.equal(channels[0].currentTime, 0);
   assert.equal(channels[0].volume, 0);
   assert.equal(channels[1].paused, false);
-  assert.equal(channels[1].volume, 0.3);
+  assert.equal(channels[1].volume, EXPECTED_DEFAULT_TARGET_VOLUME);
   assert.equal(frames.size(), 0);
 });
 
@@ -917,7 +952,7 @@ test("restarts a retired pending fade after an explicit resume", async () => {
   frames.runNext(5_100);
   assert.equal(channels[0].paused, true);
   assert.equal(channels[1].paused, false);
-  assert.equal(channels[1].volume, 0.3);
+  assert.equal(channels[1].volume, EXPECTED_DEFAULT_TARGET_VOLUME);
 });
 
 test("duplicate ended events do not complete the following fade early", async () => {
@@ -1029,7 +1064,7 @@ test("resumes an established fade while active playback is pending", async () =>
   frames.runNext(5_000);
   assert.equal(channels[0].paused, true);
   assert.equal(channels[1].paused, false);
-  assert.equal(channels[1].volume, 0.3);
+  assert.equal(channels[1].volume, EXPECTED_DEFAULT_TARGET_VOLUME);
   assert.equal(frames.size(), 0);
 });
 
@@ -1218,6 +1253,6 @@ test("coalesces concurrent resumes into one fade frame", async () => {
   frames.runNext(5_000);
   assert.equal(channels[0].paused, true);
   assert.equal(channels[1].paused, false);
-  assert.equal(channels[1].volume, 0.3);
+  assert.equal(channels[1].volume, EXPECTED_DEFAULT_TARGET_VOLUME);
   assert.equal(frames.size(), 0);
 });

@@ -82,33 +82,42 @@ button:focus-visible {
   bottom: max(0.75rem, env(safe-area-inset-bottom, 0px));
   z-index: 20;
   display: grid;
+  justify-items: end;
   gap: 0.55rem;
-  width: min(19rem, calc(100vw - 1.5rem));
-  padding: 0.75rem;
+  width: max-content;
+  max-width: calc(100vw - 1.5rem);
   text-align: left;
-  background: rgba(8, 13, 39, 0.94);
-  border: 1px solid rgba(188, 156, 255, 0.52);
-  border-radius: 1rem;
-  box-shadow: 0 1rem 2.5rem rgba(0, 0, 0, 0.35);
-  backdrop-filter: blur(12px);
 }
 
 .music-player__status {
+  max-width: min(16rem, calc(100vw - 1.5rem));
+  padding: 0.55rem 0.7rem;
   margin: 0;
   color: var(--muted);
   font-size: 0.82rem;
   line-height: 1.35;
+  background: rgba(8, 13, 39, 0.94);
+  border: 1px solid rgba(188, 156, 255, 0.52);
+  border-radius: 0.85rem;
+  box-shadow: 0 1rem 2.5rem rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(12px);
 }
 
 .music-player__toggle {
-  min-width: 44px;
-  min-height: 44px;
-  padding: 0.7rem 0.9rem;
+  display: grid;
+  place-items: center;
+  width: 3rem;
+  height: 3rem;
+  min-width: 3rem;
+  min-height: 3rem;
+  padding: 0;
   color: var(--ink);
+  font-size: 1.15rem;
   font-weight: 800;
+  line-height: 1;
   background: rgba(188, 156, 255, 0.16);
   border: 1px solid rgba(188, 156, 255, 0.52);
-  border-radius: 999px;
+  border-radius: 50%;
   cursor: pointer;
 }
 
