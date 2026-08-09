@@ -1,5 +1,5 @@
 const DEFAULT_CROSSFADE_MS = 5_000;
-const DEFAULT_TARGET_VOLUME = 0.3;
+const DEFAULT_TARGET_VOLUME = 0.5;
 
 export function equalPowerVolumes(progress, targetVolume = DEFAULT_TARGET_VOLUME) {
   const bounded = Math.min(1, Math.max(0, Number(progress)));

@@ -204,39 +204,46 @@ export function initSite({
   function renderMusicState(state) {
     const views = {
       idle: {
-        label: "🎵 Play soundtrack",
+        accessibleLabel: "Play soundtrack",
+        icon: "🎵",
         pressed: "false",
         status: "Tap 🎵 to start Lunar Drive.",
       },
       starting: {
-        label: "⏸ Pause soundtrack",
+        accessibleLabel: "Pause soundtrack",
+        icon: "⏸",
         pressed: "true",
         status: "Tap 🎵 to start Lunar Drive.",
       },
       playing: {
-        label: "⏸ Pause soundtrack",
+        accessibleLabel: "Pause soundtrack",
+        icon: "⏸",
         pressed: "true",
         status: "Lunar Drive — Mondo Loops",
       },
       resuming: {
-        label: "⏸ Pause soundtrack",
+        accessibleLabel: "Pause soundtrack",
+        icon: "⏸",
         pressed: "true",
         status: "Lunar Drive — Mondo Loops",
       },
       paused: {
-        label: "▶ Resume soundtrack",
+        accessibleLabel: "Resume soundtrack",
+        icon: "▶",
         pressed: "false",
         status: "Lunar Drive — Mondo Loops · Paused",
       },
       error: {
-        label: "🎵 Try soundtrack again",
+        accessibleLabel: "Retry soundtrack",
+        icon: "↻",
         pressed: "false",
         status: "Lunar Drive couldn’t start. Tap to try again.",
       },
     };
     const view = views[state];
     if (!view) return;
-    musicButton.textContent = view.label;
+    musicButton.textContent = view.icon;
+    musicButton.setAttribute("aria-label", view.accessibleLabel);
     musicButton.setAttribute("aria-pressed", view.pressed);
     musicStatus.textContent = view.status;
   }
