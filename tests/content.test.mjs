@@ -8,28 +8,22 @@ import {
   pickNextMessage,
 } from "../src/content.mjs";
 
-test("contains separate approved fictional message pools", () => {
+test("provides 24 distinct fictional transmissions per source", () => {
   assert.deepEqual(Object.keys(MESSAGE_POOLS), ["naufal", "rity"]);
-  assert.deepEqual(MESSAGE_POOLS.naufal, [
-    "Naufal entered the orbit. Normal behavior immediately left.",
-    "Current status: dramatic, but still present.",
-    "Acts chaotic. Still checks if Rity is okay.",
-    "Naufal has a plan. The universe is concerned.",
-    "Somehow both the problem and the tech support.",
-    "Orbit stability: questionable. Commitment: still online.",
-    "Naufal found a new way to be weird. Again.",
-    "Romance detected. Naufal is pretending not to notice.",
-  ]);
-  assert.deepEqual(MESSAGE_POOLS.rity, [
-    "Rity entered the orbit. Naufal's peace immediately left.",
-    "Roasting Naufal remains a renewable energy source.",
-    "Acts unimpressed. Keeps showing up anyway.",
-    "Patience level: somehow still above zero.",
-    "Rity detected unnecessary Naufal behavior.",
-    "Romance detected. Sarcasm deployed immediately.",
-    "Orbit supervisor: tired, but operational.",
-    "Caring, but please do not make it weird.",
-  ]);
+
+  const allMessages = [];
+  for (const [source, pool] of Object.entries(MESSAGE_POOLS)) {
+    assert.equal(pool.length, 24, source + " pool length");
+    assert.equal(new Set(pool).size, 24, source + " pool uniqueness");
+    assert.equal(Object.isFrozen(pool), true, source + " pool immutability");
+    for (const message of pool) {
+      assert.equal(typeof message, "string");
+      assert.notEqual(message.trim(), "");
+      allMessages.push(message);
+    }
+  }
+
+  assert.equal(new Set(allMessages).size, allMessages.length);
 });
 
 test("contains the approved anti-cringe responses", () => {
@@ -51,6 +45,29 @@ test("selects independently by source without an immediate repeat", () => {
     source: "rity",
     index: 1,
     message: MESSAGE_POOLS.rity[1],
+  });
+});
+
+test("selects the expanded final index and wraps its immediate repeat", () => {
+  assert.deepEqual(pickNextMessage("naufal", -1, () => 1), {
+    source: "naufal",
+    index: 23,
+    message: MESSAGE_POOLS.naufal[23],
+  });
+  assert.deepEqual(pickNextMessage("naufal", 23, () => 1), {
+    source: "naufal",
+    index: 0,
+    message: MESSAGE_POOLS.naufal[0],
+  });
+  assert.deepEqual(pickNextMessage("rity", -1, () => 1), {
+    source: "rity",
+    index: 23,
+    message: MESSAGE_POOLS.rity[23],
+  });
+  assert.deepEqual(pickNextMessage("rity", 23, () => 1), {
+    source: "rity",
+    index: 0,
+    message: MESSAGE_POOLS.rity[0],
   });
 });
 
