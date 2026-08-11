@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { initSite as initProductionSite } from "../script.js";
+import { MESSAGE_POOLS } from "../src/content.mjs";
 
 class FakeElement {
   constructor() {
@@ -409,7 +410,7 @@ test("routes each star to its own attributed message pool", () => {
   const { documentRef, elements } = createFixture();
   initSite({
     documentRef,
-    random: () => 0,
+    random: () => 1,
     schedule: () => 1,
     cancelSchedule: () => {},
   });
@@ -431,6 +432,25 @@ test("routes each star to its own attributed message pool", () => {
     elements.message.textContent,
     "Rity entered the orbit. Naufal's peace immediately left.",
   );
+});
+
+test("advances each source transmission deck independently", async () => {
+  const { documentRef, elements } = createFixture();
+  initSite({
+    documentRef,
+    random: () => 1,
+    schedule: () => 1,
+    cancelSchedule: () => {},
+  });
+
+  await elements.stars[0].click();
+  assert.equal(elements.message.textContent, MESSAGE_POOLS.naufal[0]);
+
+  await elements.stars[0].click();
+  assert.equal(elements.message.textContent, MESSAGE_POOLS.naufal[1]);
+
+  await elements.stars[1].click();
+  assert.equal(elements.message.textContent, MESSAGE_POOLS.rity[0]);
 });
 
 test("replays the message reveal hook on star interaction", () => {
@@ -541,6 +561,61 @@ test("prefers native sharing", async () => {
   assert.equal(elements.shareFallback.hidden, true);
 });
 
+test("shares the currently displayed transmission through native sharing", async () => {
+  const calls = [];
+  const { documentRef, elements } = createFixture();
+  initSite({
+    documentRef,
+    random: () => 1,
+    nativeShare: async (payload) => calls.push(payload),
+    writeClipboard: async () => assert.fail("clipboard should not run"),
+    schedule: () => 1,
+    cancelSchedule: () => {},
+  });
+
+  await elements.stars[0].click();
+  await elements.shareButton.click();
+
+  assert.equal(elements.shareButton.textContent, "Share This Transmission");
+  assert.deepEqual(calls, [
+    {
+      title: "Transmission from Naufal ✨",
+      text:
+        "“" +
+        MESSAGE_POOLS.naufal[0] +
+        "” — Naufal\n\nOur Tiny Universe",
+      url: "https://whizher.github.io/our-tiny-universe/",
+    },
+  ]);
+});
+
+test("copies the currently displayed transmission with the homepage link", async () => {
+  const copied = [];
+  const { documentRef, elements } = createFixture();
+  initSite({
+    documentRef,
+    random: () => 1,
+    nativeShare: null,
+    writeClipboard: async (value) => copied.push(value),
+    schedule: () => 1,
+    cancelSchedule: () => {},
+  });
+
+  await elements.stars[1].click();
+  await elements.shareButton.click();
+
+  assert.deepEqual(copied, [
+    "“" +
+      MESSAGE_POOLS.rity[0] +
+      "” — Rity\n\nOur Tiny Universe\n" +
+      "https://whizher.github.io/our-tiny-universe/",
+  ]);
+  assert.equal(
+    elements.shareStatus.textContent,
+    "Transmission copied ✨",
+  );
+});
+
 test("falls back to clipboard when native sharing is unavailable", async () => {
   const copied = [];
   const { documentRef, elements } = createFixture();
@@ -563,6 +638,7 @@ test("falls back to clipboard after a non-cancelled native share failure", async
   const { documentRef, elements } = createFixture();
   initSite({
     documentRef,
+    random: () => 1,
     nativeShare: async () => {
       throw new Error("share failed");
     },
@@ -570,11 +646,15 @@ test("falls back to clipboard after a non-cancelled native share failure", async
     schedule: () => 1,
     cancelSchedule: () => {},
   });
+  await elements.stars[0].click();
   await elements.shareButton.click();
   assert.deepEqual(copied, [
-    "https://whizher.github.io/our-tiny-universe/",
+    "“" +
+      MESSAGE_POOLS.naufal[0] +
+      "” — Naufal\n\nOur Tiny Universe\n" +
+      "https://whizher.github.io/our-tiny-universe/",
   ]);
-  assert.equal(elements.shareStatus.textContent, "Link copied ✨");
+  assert.equal(elements.shareStatus.textContent, "Transmission copied ✨");
   assert.equal(elements.shareStatus.hidden, false);
   assert.equal(elements.shareFallback.hidden, true);
 });
@@ -598,6 +678,7 @@ test("keeps cancellation silent and reveals a manual fallback on failure", async
   const failed = createFixture();
   initSite({
     documentRef: failed.documentRef,
+    random: () => 1,
     nativeShare: async () => {
       throw new Error("share failed");
     },
@@ -607,7 +688,12 @@ test("keeps cancellation silent and reveals a manual fallback on failure", async
     schedule: () => 1,
     cancelSchedule: () => {},
   });
+  await failed.elements.stars[1].click();
   await failed.elements.shareButton.click();
+  assert.equal(
+    failed.elements.message.textContent,
+    MESSAGE_POOLS.rity[0],
+  );
   assert.equal(failed.elements.shareFallback.hidden, false);
 });
 

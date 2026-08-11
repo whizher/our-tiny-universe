@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   ANTI_CRINGE_MESSAGES,
   MESSAGE_POOLS,
+  createMessageDeck,
   createShootingStarSpecs,
   pickNextAntiCringe,
   pickNextMessage,
@@ -69,6 +70,88 @@ test("selects the expanded final index and wraps its immediate repeat", () => {
     index: 0,
     message: MESSAGE_POOLS.rity[0],
   });
+});
+
+test("deals every source transmission exactly once per cycle", () => {
+  for (const source of ["naufal", "rity"]) {
+    const deck = createMessageDeck(source, () => 1);
+    const expectedIndexes = MESSAGE_POOLS[source].map((_, index) => index);
+
+    for (let cycle = 0; cycle < 2; cycle += 1) {
+      const selections = Array.from(
+        { length: MESSAGE_POOLS[source].length },
+        () => deck.next(),
+      );
+      assert.deepEqual(
+        selections.map((selection) => selection.index),
+        expectedIndexes,
+        source + " cycle " + cycle,
+      );
+      assert.ok(
+        selections.every(
+          (selection) =>
+            selection.source === source &&
+            selection.message === MESSAGE_POOLS[source][selection.index],
+        ),
+      );
+    }
+  }
+});
+
+test("prevents an immediate repeat across a reshuffle boundary", () => {
+  const randomValues = [
+    ...Array(23).fill(1),
+    0,
+    ...Array(22).fill(1),
+  ];
+  const deck = createMessageDeck(
+    "naufal",
+    () => randomValues.shift() ?? 1,
+  );
+  const firstCycle = Array.from(
+    { length: MESSAGE_POOLS.naufal.length },
+    () => deck.next(),
+  );
+  const nextCycleFirst = deck.next();
+
+  assert.equal(firstCycle.at(-1).index, 23);
+  assert.equal(nextCycleFirst.index, 1);
+  assert.notEqual(nextCycleFirst.index, firstCycle.at(-1).index);
+});
+
+test("keeps message deck state independent by source", () => {
+  const naufalDeck = createMessageDeck("naufal", () => 1);
+  const rityDeck = createMessageDeck("rity", () => 1);
+
+  assert.equal(naufalDeck.next().index, 0);
+  assert.equal(naufalDeck.next().index, 1);
+  assert.equal(rityDeck.next().index, 0);
+});
+
+test("uses injected randomness deterministically", () => {
+  const firstDeck = createMessageDeck("naufal", () => 0.5);
+  const secondDeck = createMessageDeck("naufal", () => 0.5);
+  const draw = (deck) =>
+    Array.from({ length: 8 }, () => deck.next().index);
+
+  assert.deepEqual(draw(firstDeck), draw(secondDeck));
+});
+
+test("rejects an unknown message deck source", () => {
+  assert.throws(
+    () => createMessageDeck("unknown", () => 0),
+    /Unknown message source/,
+  );
+});
+
+test("rejects inherited message deck sources", () => {
+  for (const source of ["toString", "__proto__"]) {
+    assert.throws(
+      () => createMessageDeck(source, () => 0),
+      /Unknown message source/,
+      source,
+    );
+  }
 });
 
 test("rejects an unknown message source", () => {

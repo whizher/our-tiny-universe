@@ -64,6 +64,47 @@ function boundedRandom(random) {
   return Math.min(0.999_999, Math.max(0, Number(random())));
 }
 
+function shuffledIndexes(length, random) {
+  const indexes = Array.from({ length }, (_, index) => index);
+  for (let current = indexes.length - 1; current > 0; current -= 1) {
+    const swapIndex = Math.floor(boundedRandom(random) * (current + 1));
+    [indexes[current], indexes[swapIndex]] = [
+      indexes[swapIndex],
+      indexes[current],
+    ];
+  }
+  return indexes;
+}
+
+export function createMessageDeck(source, random = Math.random) {
+  if (!Object.hasOwn(MESSAGE_POOLS, source)) {
+    throw new RangeError("Unknown message source: " + source);
+  }
+  const pool = MESSAGE_POOLS[source];
+
+  let remainingIndexes = [];
+  let lastIndex = -1;
+
+  function refill() {
+    remainingIndexes = shuffledIndexes(pool.length, random);
+    if (remainingIndexes[0] === lastIndex) {
+      [remainingIndexes[0], remainingIndexes[1]] = [
+        remainingIndexes[1],
+        remainingIndexes[0],
+      ];
+    }
+  }
+
+  return Object.freeze({
+    next() {
+      if (remainingIndexes.length === 0) refill();
+      const index = remainingIndexes.shift();
+      lastIndex = index;
+      return { source, index, message: pool[index] };
+    },
+  });
+}
+
 function pickFromPool(pool, lastIndex, random) {
   let index = Math.floor(boundedRandom(random) * pool.length);
   if (index === lastIndex) {

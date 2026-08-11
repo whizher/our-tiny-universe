@@ -4,26 +4,57 @@ import {
   millisecondsUntilNextPontianakMidnight,
 } from "./src/time.mjs";
 import {
+  createMessageDeck,
   createShootingStarSpecs,
   pickNextAntiCringe,
-  pickNextMessage,
 } from "./src/content.mjs";
 import { createCrossfadeController } from "./src/audio.mjs";
 
 const CANONICAL_URL = "https://whizher.github.io/our-tiny-universe/";
 
-export async function shareUniverse({
-  nativeShare,
-  writeClipboard,
-  url = CANONICAL_URL,
-}) {
-  if (nativeShare) {
-    try {
-      await nativeShare({
+function createSharePayload(transmission, url) {
+  if (!transmission) {
+    return {
+      clipboardText: url,
+      nativePayload: {
         title: "Our Tiny Universe 🌌",
         text: "Same chaos, more teamwork.",
         url,
-      });
+      },
+    };
+  }
+
+  const name =
+    transmission.source.charAt(0).toUpperCase() +
+    transmission.source.slice(1);
+  const text =
+    "“" +
+    transmission.message +
+    "” — " +
+    name +
+    "\n\nOur Tiny Universe";
+
+  return {
+    clipboardText: text + "\n" + url,
+    nativePayload: {
+      title: "Transmission from " + name + " ✨",
+      text,
+      url,
+    },
+  };
+}
+
+export async function shareUniverse({
+  nativeShare,
+  writeClipboard,
+  transmission = null,
+  url = CANONICAL_URL,
+}) {
+  const payload = createSharePayload(transmission, url);
+
+  if (nativeShare) {
+    try {
+      await nativeShare(payload.nativePayload);
       return "shared";
     } catch (error) {
       if (error && error.name === "AbortError") {
@@ -34,7 +65,7 @@ export async function shareUniverse({
 
   if (writeClipboard) {
     try {
-      await writeClipboard(url);
+      await writeClipboard(payload.clipboardText);
       return "copied";
     } catch {
       // Continue to the visible manual-link fallback.
@@ -115,13 +146,16 @@ export function initSite({
     throw new Error("Our Tiny Universe markup is incomplete");
   }
 
-  const lastMessageIndexes = new Map([
-    ["naufal", -1],
-    ["rity", -1],
-  ]);
+  const messageDecks = new Map(
+    ["naufal", "rity"].map((source) => [
+      source,
+      createMessageDeck(source, random),
+    ]),
+  );
   let midnightTimer;
   let cleanupTimer;
   let lastAntiCringeIndex = -1;
+  let currentTransmission = null;
   let anniversaryActive = false;
 
   function renderShootingStars(count) {
@@ -163,12 +197,9 @@ export function initSite({
 
   function revealMessage(event) {
     const source = event.currentTarget.dataset.messageSource;
-    const selection = pickNextMessage(
-      source,
-      lastMessageIndexes.get(source),
-      random,
-    );
-    lastMessageIndexes.set(source, selection.index);
+    const selection = messageDecks.get(source).next();
+    currentTransmission = selection;
+    shareButton.textContent = "Share This Transmission";
     messageTitle.textContent =
       "Transmission from " +
       source.charAt(0).toUpperCase() +
@@ -192,9 +223,16 @@ export function initSite({
     shareStatus.hidden = true;
     shareStatus.textContent = "";
     shareFallback.hidden = true;
-    const outcome = await shareUniverse({ nativeShare, writeClipboard });
+    const transmission = currentTransmission;
+    const outcome = await shareUniverse({
+      nativeShare,
+      writeClipboard,
+      transmission,
+    });
     if (outcome === "copied") {
-      shareStatus.textContent = "Link copied ✨";
+      shareStatus.textContent = transmission
+        ? "Transmission copied ✨"
+        : "Link copied ✨";
       shareStatus.hidden = false;
     } else if (outcome === "manual") {
       shareFallback.hidden = false;
