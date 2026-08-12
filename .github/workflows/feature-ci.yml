@@ -1,0 +1,40 @@
+name: Feature CI
+
+on:
+  push:
+    branches: ["feature/enhanced-shooting-stars"]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Run tests
+        run: node --test tests/*.test.mjs
+
+      - name: Validate runtime references
+        run: node scripts/validate.mjs
+
+      - name: Build public artifact
+        run: node scripts/build-site.mjs
+
+      - name: Compare built runtime sources
+        run: |
+          cmp script.js _site/script.js
+          cmp src/content.mjs _site/src/content.mjs
+
+      - name: Verify soundtrack hash
+        run: |
+          test "$(sha256sum assets/lunar-drive.opus | cut -d' ' -f1)" = "ba8d55ed26addb68ea68ca4703b96aeee665d429981495db3aee272e04081765"
+          test "$(sha256sum _site/assets/lunar-drive.opus | cut -d' ' -f1)" = "ba8d55ed26addb68ea68ca4703b96aeee665d429981495db3aee272e04081765"
