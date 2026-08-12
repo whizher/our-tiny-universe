@@ -11,6 +11,14 @@ import {
 import { createCrossfadeController } from "./src/audio.mjs";
 
 const CANONICAL_URL = "https://whizher.github.io/our-tiny-universe/";
+const ACTIVE_AMBIENT_WINDOW_MS = 60_000;
+const CALM_AMBIENT_RANGE = [45_000, 90_000];
+const ACTIVE_AMBIENT_RANGE = [18_000, 36_000];
+
+function randomDelay([minimum, maximum], random) {
+  const value = Math.min(0.999_999, Math.max(0, Number(random())));
+  return minimum + Math.floor(value * (maximum - minimum + 1));
+}
 
 function createSharePayload(transmission, url) {
   if (!transmission) {
@@ -154,22 +162,45 @@ export function initSite({
   );
   let midnightTimer;
   let cleanupTimer;
+  let ambientTimer;
+  let lastTransmissionActivityAt = -Infinity;
   let lastAntiCringeIndex = -1;
   let currentTransmission = null;
   let anniversaryActive = false;
 
-  function renderShootingStars(count) {
-    const particles = createShootingStarSpecs(count, random).map((spec) => {
+  function renderShootingStars(preset) {
+    if (reducedMotion()) return;
+
+    const specs = createShootingStarSpecs(preset, random);
+    const particles = specs.map((spec) => {
       const particle = documentRef.createElement("span");
-      particle.className = "shooting-star";
+      particle.className = spec.isComet
+        ? "shooting-star shooting-star--comet"
+        : "shooting-star";
+      particle.dataset.tone = spec.color;
       particle.style.setProperty("--left", spec.left + "%");
+      particle.style.setProperty("--top", spec.top + "%");
       particle.style.setProperty("--delay", spec.delayMs + "ms");
       particle.style.setProperty("--duration", spec.durationMs + "ms");
+      particle.style.setProperty("--angle", spec.angleDeg + "deg");
+      particle.style.setProperty("--trail", spec.trailPx + "px");
+      particle.style.setProperty("--thickness", spec.thicknessPx + "px");
+      particle.style.setProperty("--scale", String(spec.scale));
+      particle.style.setProperty("--brightness", String(spec.brightness));
+      particle.style.setProperty("--travel-x", spec.travelXvw + "vw");
+      particle.style.setProperty("--travel-y", spec.travelYvh + "vh");
       return particle;
     });
+
     shootingLayer.replaceChildren(...particles);
     cancelSchedule(cleanupTimer);
-    cleanupTimer = schedule(() => shootingLayer.replaceChildren(), 2_000);
+    const maximumLifetime = Math.max(
+      ...specs.map((spec) => spec.delayMs + spec.durationMs),
+    );
+    cleanupTimer = schedule(
+      () => shootingLayer.replaceChildren(),
+      maximumLifetime + 160,
+    );
   }
 
   function renderTemporalState() {
@@ -183,7 +214,7 @@ export function initSite({
       : state.daysUntilNext + " hari menuju orbit anniversary berikutnya.";
 
     if (state.isAnniversary && !anniversaryActive && !reducedMotion()) {
-      renderShootingStars(18);
+      renderShootingStars("anniversary");
     }
     anniversaryActive = state.isAnniversary;
   }
@@ -193,6 +224,27 @@ export function initSite({
       renderTemporalState();
       scheduleCounterUpdate();
     }, millisecondsUntilNextPontianakMidnight(now()) + 50);
+  }
+
+  function scheduleAmbientMeteor() {
+    cancelSchedule(ambientTimer);
+    if (reducedMotion()) return;
+
+    const elapsed = now().getTime() - lastTransmissionActivityAt;
+    const range =
+      elapsed < ACTIVE_AMBIENT_WINDOW_MS
+        ? ACTIVE_AMBIENT_RANGE
+        : CALM_AMBIENT_RANGE;
+
+    ambientTimer = schedule(() => {
+      renderShootingStars("ambient");
+      scheduleAmbientMeteor();
+    }, randomDelay(range, random));
+  }
+
+  function markTransmissionActivity() {
+    lastTransmissionActivityAt = now().getTime();
+    scheduleAmbientMeteor();
   }
 
   function revealMessage(event) {
@@ -209,6 +261,8 @@ export function initSite({
     message.classList.remove("message--reveal");
     void message.offsetWidth;
     message.classList.add("message--reveal");
+    renderShootingStars("transmission");
+    markTransmissionActivity();
   }
 
   function launchAntiCringe() {
@@ -216,7 +270,7 @@ export function initSite({
     lastAntiCringeIndex = selection.index;
     antiResult.hidden = false;
     antiResult.textContent = selection.message;
-    renderShootingStars(12);
+    renderShootingStars("antiCringe");
   }
 
   async function launchShare() {
@@ -302,6 +356,7 @@ export function initSite({
 
   renderTemporalState();
   scheduleCounterUpdate();
+  scheduleAmbientMeteor();
   stars.forEach((star) => star.addEventListener("click", revealMessage));
   antiButton.addEventListener("click", launchAntiCringe);
   shareButton.addEventListener("click", launchShare);
@@ -317,6 +372,7 @@ export function initSite({
       musicButton.removeEventListener("click", toggleSoundtrack);
       soundtrack.destroy();
       cancelSchedule(midnightTimer);
+      cancelSchedule(ambientTimer);
       cancelSchedule(cleanupTimer);
       shootingLayer.replaceChildren();
     },
