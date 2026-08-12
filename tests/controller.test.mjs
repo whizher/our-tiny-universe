@@ -10,7 +10,11 @@ class FakeElement {
     this.attributes = new Map();
     this.hidden = false;
     this.listeners = new Map();
-    this.style = { setProperty() {} };
+    this.styleProperties = new Map();
+    this.style = {
+      setProperty: (name, value) => this.styleProperties.set(name, String(value)),
+      getPropertyValue: (name) => this.styleProperties.get(name) ?? "",
+    };
     this.textContent = "";
     this.offsetWidth = 1;
     this.currentTime = 0;
@@ -465,7 +469,7 @@ test("replays the message reveal hook on star interaction", () => {
   assert.ok(elements.message.classes.has("message--reveal"));
 });
 
-test("creates and automatically removes the anti-cringe effect", () => {
+test("creates and automatically removes the anti-cringe effect", async () => {
   const { documentRef, elements } = createFixture();
   const timers = [];
   const schedule = (callback, delay) => {
@@ -478,16 +482,54 @@ test("creates and automatically removes the anti-cringe effect", () => {
     schedule,
     cancelSchedule: () => {},
   });
-  elements.antiButton.click();
+  await elements.antiButton.click();
   assert.equal(elements.antiResult.hidden, false);
   assert.equal(elements.antiResult.textContent, "Okay, cukup romantisnya.");
-  elements.antiButton.click();
+  await elements.antiButton.click();
   assert.equal(
     elements.antiResult.textContent,
     "Romance levels exceeded safe limits.",
   );
   assert.equal(elements.layer.children.length, 12);
-  const cleanup = timers.find((timer) => timer.delay === 2_000);
+  const cleanup = timers.find(
+    (timer) => timer.delay > 1_000 && timer.delay < 3_000,
+  );
+  assert.ok(cleanup);
+  cleanup.callback();
+  assert.equal(elements.layer.children.length, 0);
+});
+
+test("renders rich shooting-star variables and derived cleanup", async () => {
+  const scheduled = [];
+  const { documentRef, elements } = createFixture();
+  initSite({
+    documentRef,
+    random: () => 0.5,
+    reducedMotion: () => false,
+    schedule: (callback, delay) => {
+      scheduled.push({ callback, delay });
+      return scheduled.length;
+    },
+    cancelSchedule: () => {},
+  });
+
+  await elements.antiButton.click();
+
+  assert.equal(elements.layer.children.length, 12);
+  const particle = elements.layer.children[0];
+  assert.match(particle.className, /shooting-star/);
+  assert.match(particle.style.getPropertyValue("--left"), /%$/);
+  assert.match(particle.style.getPropertyValue("--top"), /%$/);
+  assert.match(particle.style.getPropertyValue("--angle"), /deg$/);
+  assert.match(particle.style.getPropertyValue("--trail"), /px$/);
+  assert.match(particle.style.getPropertyValue("--thickness"), /px$/);
+  assert.match(particle.style.getPropertyValue("--travel-x"), /vw$/);
+  assert.match(particle.style.getPropertyValue("--travel-y"), /vh$/);
+  assert.ok(["white", "gold", "lavender"].includes(particle.dataset.tone));
+
+  const cleanup = scheduled.find(
+    ({ delay }) => delay > 1_000 && delay < 3_000,
+  );
   assert.ok(cleanup);
   cleanup.callback();
   assert.equal(elements.layer.children.length, 0);
@@ -521,6 +563,125 @@ test("skips the anniversary flourish with reduced motion", () => {
     cancelSchedule: () => {},
   });
   assert.equal(elements.universe.dataset.anniversary, "true");
+  assert.equal(elements.layer.children.length, 0);
+});
+
+test("renders a five-particle transmission burst", async () => {
+  const { documentRef, elements } = createFixture();
+  initSite({
+    documentRef,
+    random: () => 0.5,
+    reducedMotion: () => false,
+    schedule: () => 1,
+    cancelSchedule: () => {},
+  });
+
+  await elements.stars[0].click();
+  assert.equal(elements.layer.children.length, 5);
+});
+
+test("switches ambient scheduling from calm to active after a transmission", async () => {
+  const scheduled = [];
+  let currentTime = new Date("2026-08-12T04:00:00.000Z");
+  const { documentRef, elements } = createFixture();
+
+  initSite({
+    documentRef,
+    random: () => 0,
+    reducedMotion: () => false,
+    now: () => currentTime,
+    schedule: (callback, delay) => {
+      scheduled.push({ callback, delay });
+      return scheduled.length;
+    },
+    cancelSchedule: () => {},
+  });
+
+  assert.ok(scheduled.some(({ delay }) => delay === 45_000));
+
+  await elements.stars[0].click();
+  assert.ok(scheduled.some(({ delay }) => delay === 18_000));
+
+  currentTime = new Date(currentTime.getTime() + 60_001);
+  const activeAmbient = scheduled.findLast(({ delay }) => delay === 18_000);
+  activeAmbient.callback();
+  assert.equal(scheduled.at(-1).delay, 45_000);
+});
+
+test("does not activate ambient cadence from Anti-Cringe", async () => {
+  const scheduled = [];
+  const { documentRef, elements } = createFixture();
+  initSite({
+    documentRef,
+    random: () => 0,
+    reducedMotion: () => false,
+    now: () => new Date("2026-08-12T04:00:00.000Z"),
+    schedule: (callback, delay) => {
+      scheduled.push({ callback, delay });
+      return scheduled.length;
+    },
+    cancelSchedule: () => {},
+  });
+
+  await elements.antiButton.click();
+  assert.equal(scheduled.some(({ delay }) => delay === 18_000), false);
+});
+
+test("suppresses shooting-star effects and ambient scheduling for reduced motion", async () => {
+  const scheduled = [];
+  const { documentRef, elements } = createFixture();
+  initSite({
+    documentRef,
+    random: () => 0,
+    reducedMotion: () => true,
+    now: () => new Date("2026-07-07T05:00:00.000Z"),
+    schedule: (callback, delay) => {
+      scheduled.push({ callback, delay });
+      return scheduled.length;
+    },
+    cancelSchedule: () => {},
+  });
+
+  await elements.stars[0].click();
+  await elements.antiButton.click();
+
+  assert.equal(elements.layer.children.length, 0);
+  assert.equal(
+    scheduled.some(({ delay }) => delay >= 18_000 && delay <= 90_000),
+    false,
+  );
+});
+
+test("destroy cancels ambient and shooting-star cleanup timers", async () => {
+  const scheduled = [];
+  const cancelled = [];
+  const { documentRef, elements } = createFixture();
+  const site = initSite({
+    documentRef,
+    random: () => 0,
+    reducedMotion: () => false,
+    schedule: (callback, delay) => {
+      const id = scheduled.length + 1;
+      scheduled.push({ id, callback, delay });
+      return id;
+    },
+    cancelSchedule: (id) => {
+      if (id !== undefined) cancelled.push(id);
+    },
+  });
+
+  const ambient = scheduled.find(({ delay }) => delay === 45_000);
+  await elements.antiButton.click();
+  const cleanup = scheduled.find(
+    ({ delay }) => delay > 1_000 && delay < 3_000,
+  );
+
+  site.destroy();
+
+  assert.ok(ambient);
+  assert.ok(cleanup);
+  assert.ok(cancelled.includes(ambient.id));
+  assert.ok(cancelled.includes(cleanup.id));
   assert.equal(elements.layer.children.length, 0);
 });
 

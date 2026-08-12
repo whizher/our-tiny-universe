@@ -168,12 +168,46 @@ test("selects anti-cringe copy without an immediate repeat", () => {
   });
 });
 
-test("creates bounded shooting-star specifications", () => {
-  const specs = createShootingStarSpecs(3, () => 0.5);
-  assert.equal(specs.length, 3);
-  for (const spec of specs) {
-    assert.ok(spec.left >= 5 && spec.left <= 95);
-    assert.ok(spec.delayMs >= 0 && spec.delayMs <= 500);
-    assert.ok(spec.durationMs >= 900 && spec.durationMs <= 1_400);
+test("creates bounded shooting-star specifications for every preset", () => {
+  const expectedCounts = {
+    ambient: 2,
+    transmission: 5,
+    antiCringe: 12,
+    anniversary: 18,
+  };
+
+  for (const [preset, expectedCount] of Object.entries(expectedCounts)) {
+    const specs = createShootingStarSpecs(preset, () => 0.5);
+    assert.equal(specs.length, expectedCount, preset);
+    for (const spec of specs) {
+      assert.ok(spec.left >= 5 && spec.left <= 95);
+      assert.ok(spec.top >= -8 && spec.top <= 10);
+      assert.ok(spec.delayMs >= 0 && spec.delayMs <= 900);
+      assert.ok(spec.durationMs >= 850 && spec.durationMs <= 1_900);
+      assert.ok(spec.angleDeg >= -52 && spec.angleDeg <= -26);
+      assert.ok(spec.trailPx >= 56 && spec.trailPx <= 150);
+      assert.ok(spec.thicknessPx >= 1 && spec.thicknessPx <= 3.2);
+      assert.ok(spec.scale >= 0.7 && spec.scale <= 1.35);
+      assert.ok(spec.brightness >= 0.5 && spec.brightness <= 1);
+      assert.ok(spec.travelXvw >= -62 && spec.travelXvw <= -32);
+      assert.ok(spec.travelYvh >= 72 && spec.travelYvh <= 104);
+      assert.ok(["white", "gold", "lavender"].includes(spec.color));
+      assert.equal(typeof spec.isComet, "boolean");
+      assert.equal(Object.isFrozen(spec), true);
+    }
   }
+});
+
+test("creates deterministic shooting-star specifications", () => {
+  assert.deepEqual(
+    createShootingStarSpecs("transmission", () => 0.25),
+    createShootingStarSpecs("transmission", () => 0.25),
+  );
+});
+
+test("rejects an unknown shooting-star preset", () => {
+  assert.throws(
+    () => createShootingStarSpecs("meteorApocalypse", () => 0),
+    /Unknown shooting-star preset/,
+  );
 });

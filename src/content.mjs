@@ -132,10 +132,89 @@ export function pickNextAntiCringe(
   return pickFromPool(ANTI_CRINGE_MESSAGES, lastIndex, random);
 }
 
-export function createShootingStarSpecs(count = 12, random = Math.random) {
-  return Array.from({ length: count }, () => ({
-    left: 5 + boundedRandom(random) * 90,
-    delayMs: boundedRandom(random) * 500,
-    durationMs: 900 + boundedRandom(random) * 500,
-  }));
+const SHOOTING_STAR_PRESETS = Object.freeze({
+  ambient: Object.freeze({
+    count: 2,
+    delayMs: [0, 120],
+    durationMs: [1_200, 1_900],
+    angleDeg: [-48, -30],
+    trailPx: [56, 92],
+    thicknessPx: [1, 1.7],
+    scale: [0.7, 0.95],
+    brightness: [0.5, 0.72],
+    cometChance: 0.03,
+  }),
+  transmission: Object.freeze({
+    count: 5,
+    delayMs: [0, 320],
+    durationMs: [850, 1_350],
+    angleDeg: [-50, -28],
+    trailPx: [68, 112],
+    thicknessPx: [1.2, 2.1],
+    scale: [0.8, 1.08],
+    brightness: [0.62, 0.86],
+    cometChance: 0.08,
+  }),
+  antiCringe: Object.freeze({
+    count: 12,
+    delayMs: [0, 500],
+    durationMs: [900, 1_500],
+    angleDeg: [-52, -26],
+    trailPx: [72, 126],
+    thicknessPx: [1.3, 2.4],
+    scale: [0.82, 1.16],
+    brightness: [0.66, 0.92],
+    cometChance: 0.12,
+  }),
+  anniversary: Object.freeze({
+    count: 18,
+    delayMs: [0, 900],
+    durationMs: [950, 1_700],
+    angleDeg: [-52, -26],
+    trailPx: [76, 150],
+    thicknessPx: [1.4, 3.2],
+    scale: [0.85, 1.35],
+    brightness: [0.7, 1],
+    cometChance: 0.2,
+  }),
+});
+
+function between([minimum, maximum], random) {
+  return minimum + boundedRandom(random) * (maximum - minimum);
+}
+
+function pickMeteorColor(random) {
+  const value = boundedRandom(random);
+  if (value < 0.72) return "white";
+  if (value < 0.86) return "gold";
+  return "lavender";
+}
+
+export function createShootingStarSpecs(
+  preset = "ambient",
+  random = Math.random,
+) {
+  if (!Object.hasOwn(SHOOTING_STAR_PRESETS, preset)) {
+    throw new RangeError("Unknown shooting-star preset: " + preset);
+  }
+  const config = SHOOTING_STAR_PRESETS[preset];
+
+  return Array.from({ length: config.count }, () => {
+    const isComet = boundedRandom(random) < config.cometChance;
+    return Object.freeze({
+      left: 5 + boundedRandom(random) * 90,
+      top: -8 + boundedRandom(random) * 18,
+      delayMs: between(config.delayMs, random),
+      durationMs: between(config.durationMs, random),
+      angleDeg: between(config.angleDeg, random),
+      trailPx: between(config.trailPx, random),
+      thicknessPx: between(config.thicknessPx, random),
+      scale: between(config.scale, random),
+      brightness: between(config.brightness, random),
+      travelXvw: -(32 + boundedRandom(random) * 30),
+      travelYvh: 72 + boundedRandom(random) * 32,
+      color: pickMeteorColor(random),
+      isComet,
+    });
+  });
 }

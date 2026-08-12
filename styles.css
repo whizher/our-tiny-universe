@@ -440,14 +440,58 @@ button:focus-visible {
 }
 
 .shooting-star {
+  --meteor-color: 255, 255, 255;
   position: absolute;
-  top: -10%;
+  top: var(--top);
   left: var(--left);
-  width: 5.5rem;
-  height: 2px;
-  background: linear-gradient(90deg, transparent, #ffffff);
-  transform: rotate(-35deg);
-  animation: shoot var(--duration) ease-in var(--delay) forwards;
+  width: var(--trail);
+  height: var(--thickness);
+  opacity: 0;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(var(--meteor-color), 0.2),
+    rgba(var(--meteor-color), 0.95)
+  );
+  border-radius: 999px;
+  filter: drop-shadow(0 0 0.45rem rgba(var(--meteor-color), 0.68));
+  transform: rotate(var(--angle)) scale(var(--scale));
+  transform-origin: 100% 50%;
+  animation: shoot var(--duration) cubic-bezier(0.2, 0.65, 0.35, 1)
+    var(--delay) forwards;
+}
+
+.shooting-star::after {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  width: calc(var(--thickness) * 3);
+  aspect-ratio: 1;
+  content: "";
+  background: rgb(var(--meteor-color));
+  border-radius: 50%;
+  translate: 50% -50%;
+  box-shadow:
+    0 0 0.45rem rgba(var(--meteor-color), 0.95),
+    0 0 1rem rgba(var(--meteor-color), 0.55);
+}
+
+.shooting-star[data-tone="gold"] {
+  --meteor-color: 255, 213, 106;
+}
+
+.shooting-star[data-tone="lavender"] {
+  --meteor-color: 188, 156, 255;
+}
+
+.shooting-star--comet {
+  filter:
+    drop-shadow(0 0 0.65rem rgba(var(--meteor-color), 0.85))
+    drop-shadow(0 0 1.1rem rgba(var(--meteor-color), 0.35));
+}
+
+.shooting-star--comet::after {
+  width: calc(var(--thickness) * 4.5);
 }
 
 @keyframes orbit {
@@ -476,13 +520,17 @@ button:focus-visible {
     translate: 0 0;
   }
 
-  15% {
-    opacity: 1;
+  12% {
+    opacity: var(--brightness);
+  }
+
+  70% {
+    opacity: calc(var(--brightness) * 0.9);
   }
 
   to {
     opacity: 0;
-    translate: -45vw 85vh;
+    translate: var(--travel-x) var(--travel-y);
   }
 }
 
