@@ -4,13 +4,13 @@
 
 **Goal:** Replace mutable GitHub Action major-version tags with approved immutable commit SHAs while preserving the existing Pages deployment behavior and adding a regression test that prevents tag-based Actions from returning.
 
-**Architecture:** Keep the existing single Pages workflow unchanged except for the `uses:` references. Add one focused repository test in `tests/build.test.mjs` that reads the workflow as text, verifies the exact approved action-to-SHA mapping, and requires every external Action reference to be a 40-character lowercase hexadecimal commit SHA.
+**Architecture:** Keep the existing single Pages workflow unchanged except for the `uses:` references. Add one focused repository-policy assertion to the existing, compact `tests/content.test.mjs` file so the connected GitHub whole-file writer can make the change safely; the test reads the workflow as text, verifies the exact approved action-to-SHA mapping, and requires every external Action reference to be a 40-character lowercase hexadecimal commit SHA.
 
 **Tech Stack:** GitHub Actions YAML, Node.js 22, Node built-in test runner, existing repository validator/build scripts.
 
 ## Global Constraints
 
-- Only `.github/workflows/pages.yml` and `tests/build.test.mjs` change during implementation; the approved spec and this plan remain documentation-only additions.
+- Only `.github/workflows/pages.yml` and `tests/content.test.mjs` change during implementation; the approved spec and this plan remain documentation-only additions.
 - Preserve `push` to `main` and `workflow_dispatch` triggers.
 - Preserve permissions exactly: `contents: read`, `pages: write`, `id-token: write`.
 - Preserve step order: checkout -> setup Node -> tests -> validator -> build -> configure Pages -> upload artifact -> deploy.
@@ -30,7 +30,7 @@
 ### Task 1: Enforce and apply immutable GitHub Action pins
 
 **Files:**
-- Modify: `tests/build.test.mjs`
+- Modify: `tests/content.test.mjs`
 - Modify: `.github/workflows/pages.yml`
 
 **Interfaces:**
@@ -39,7 +39,13 @@
 
 - [ ] **Step 1: Add the failing workflow-pin regression test**
 
-Add this test near the other repository-policy tests in `tests/build.test.mjs`:
+Add this import near the top of `tests/content.test.mjs`:
+
+```js
+import { readFile } from "node:fs/promises";
+```
+
+Append this test:
 
 ```js
 test("Pages workflow pins every external action to an approved immutable commit", async () => {
@@ -72,7 +78,7 @@ test("Pages workflow pins every external action to an approved immutable commit"
 Run:
 
 ```bash
-node --test --test-name-pattern="Pages workflow pins every external action" tests/build.test.mjs
+node --test --test-name-pattern="Pages workflow pins every external action" tests/content.test.mjs
 ```
 
 Expected: FAIL because the current workflow references `@v6`, `@v4`, and `@v5` rather than the approved 40-character SHAs.
@@ -114,7 +120,7 @@ Do not alter triggers, permissions, concurrency, environment, timeout, commands,
 Run:
 
 ```bash
-node --test --test-name-pattern="Pages workflow pins every external action" tests/build.test.mjs
+node --test --test-name-pattern="Pages workflow pins every external action" tests/content.test.mjs
 ```
 
 Expected: PASS.
@@ -164,15 +170,15 @@ Expected: build succeeds and every `cmp` exits `0` with no output.
 Run:
 
 ```bash
-git diff -- .github/workflows/pages.yml tests/build.test.mjs
+git diff -- .github/workflows/pages.yml tests/content.test.mjs
 ```
 
-Expected: only one new regression test and five action-reference substitutions plus their human-readable major-version comments.
+Expected: only one new regression test plus its `readFile` import and five action-reference substitutions with human-readable major-version comments.
 
 - [ ] **Step 9: Commit the implementation**
 
 ```bash
-git add .github/workflows/pages.yml tests/build.test.mjs
+git add .github/workflows/pages.yml tests/content.test.mjs
 git commit -m "ci: pin GitHub Actions to immutable commits"
 ```
 
