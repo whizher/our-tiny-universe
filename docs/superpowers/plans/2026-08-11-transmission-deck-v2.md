@@ -212,7 +212,7 @@ node --test tests/content.test.mjs
 node --test tests/*.test.mjs
 ~~~
 
-Expected: 12 content tests pass; the full baseline plus five new content tests passes with no failures.
+Expected: 13 content tests pass; the full baseline plus six new content tests passes with no failures.
 
 - [ ] **Step 7: Review and commit the deck unit**
 
@@ -339,7 +339,7 @@ node --test tests/content.test.mjs
 node --test tests/*.test.mjs
 ~~~
 
-Expected: all controller tests pass, all 12 content tests pass, and the full suite passes with no failures.
+Expected: all controller tests pass, all 13 content tests pass, and the full suite passes with no failures.
 
 - [ ] **Step 8: Review and commit controller integration**
 
@@ -595,7 +595,7 @@ node --test tests/content.test.mjs
 node --test tests/*.test.mjs
 ~~~
 
-Expected: all focused tests pass and the complete suite reports 136 passing tests with zero failures.
+Expected: all focused tests pass and the complete suite reports 137 passing tests with zero failures.
 
 - [ ] **Step 10: Review and commit transmission-aware sharing**
 
@@ -628,7 +628,7 @@ Run:
 node --test tests/*.test.mjs
 ~~~
 
-Expected: 136 tests pass, 0 fail.
+Expected: 137 tests pass, 0 fail.
 
 - [ ] **Step 2: Validate runtime references and privacy constraints**
 
@@ -775,7 +775,7 @@ Create a pull request titled Transmission Deck v2 with:
 - head: feature/transmission-deck-v2
 - summary: session-only complete-cycle message decks and sharing of the currently displayed public fictional transmission
 - privacy statement: no private material, storage, analytics, deep links, external runtime requests, or soundtrack changes
-- verification: 136/136 tests, validator, exact 10-artifact build, source/build comparison, privacy review, and matching soundtrack hashes
+- verification: 137/137 tests, validator, exact 10-artifact build, source/build comparison, privacy review, and matching soundtrack hashes
 
 Do not place permission evidence or any private material in the pull-request body.
 
@@ -834,7 +834,7 @@ Report:
 - main merge commit SHA;
 - successful Pages run URL;
 - live site URL;
-- 136/136 passing tests;
+- 137/137 passing tests;
 - validator and exact artifact results;
 - matching soundtrack hashes;
 - exact six changed paths; and
