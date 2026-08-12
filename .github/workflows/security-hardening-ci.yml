@@ -1,0 +1,41 @@
+name: Security hardening branch verification
+
+on:
+  push:
+    branches: ["security/pin-actions"]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+
+      - name: Run tests
+        run: node --test tests/*.test.mjs
+
+      - name: Validate runtime references
+        run: |
+          git rm --cached -q .github/workflows/security-hardening-ci.yml
+          node scripts/validate.mjs
+
+      - name: Build public artifact
+        run: node scripts/build-site.mjs
+
+      - name: Compare runtime sources
+        run: |
+          cmp index.html _site/index.html
+          cmp styles.css _site/styles.css
+          cmp script.js _site/script.js
+          cmp src/time.mjs _site/src/time.mjs
+          cmp src/content.mjs _site/src/content.mjs
+          cmp src/audio.mjs _site/src/audio.mjs
