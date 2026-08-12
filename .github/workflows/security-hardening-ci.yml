@@ -20,13 +20,14 @@ jobs:
         with:
           node-version: 22
 
+      - name: Exclude temporary verifier from repository policy
+        run: git rm --cached -q .github/workflows/security-hardening-ci.yml
+
       - name: Run tests
         run: node --test tests/*.test.mjs
 
       - name: Validate runtime references
-        run: |
-          git rm --cached -q .github/workflows/security-hardening-ci.yml
-          node scripts/validate.mjs
+        run: node scripts/validate.mjs
 
       - name: Build public artifact
         run: node scripts/build-site.mjs
