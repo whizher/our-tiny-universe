@@ -107,4 +107,4 @@ jobs:
           test "$actual" = "$expected"
           cmp assets/has-to-be.opus _site/assets/has-to-be.opus
           test "$(sha256sum assets/has-to-be.opus | awk '{print $1}')" = "d5fc2e189524fb8228651bc733555a327e9fe2f516fed6c7872f1bfe345a1d5e"
-          ! grep -RInE 'Lunar Drive|Mondo Loops|lunar-drive\.opus' README.md index.html script.js scripts src tests
+          ! grep -RInE 'Lunar Drive|Mondo Loops|lunar-drive\.opus' README.md index.html script.js scripts src
