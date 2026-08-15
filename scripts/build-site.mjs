@@ -14,8 +14,8 @@ for (const file of ["time.mjs", "content.mjs", "audio.mjs"]) {
 
 await cp("assets/favicon.svg", "_site/assets/favicon.svg");
 await cp(
-  "assets/lunar-drive.opus",
-  "_site/assets/lunar-drive.opus",
+  "assets/has-to-be.opus",
+  "_site/assets/has-to-be.opus",
 );
 await cp(
   "assets/social-preview.png",

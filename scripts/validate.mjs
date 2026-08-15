@@ -9,10 +9,10 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const execFileAsync = promisify(execFile);
 const MAX_TEXT_BYTES = 256 * 1024;
 const MAX_PREVIEW_BYTES = 1024 * 1024;
-const MAX_SOUNDTRACK_BYTES = 4 * 1024 * 1024;
-const SOUNDTRACK_PATH = "assets/lunar-drive.opus";
+const MAX_SOUNDTRACK_BYTES = 5 * 1024 * 1024;
+const SOUNDTRACK_PATH = "assets/has-to-be.opus";
 const SOUNDTRACK_SHA256 =
-  "ba8d55ed26addb68ea68ca4703b96aeee665d429981495db3aee272e04081765";
+  "d5fc2e189524fb8228651bc733555a327e9fe2f516fed6c7872f1bfe345a1d5e";
 const APPROVED_EXACT_PATHS = new Set([
   ".github/workflows/pages.yml",
   ".gitignore",
@@ -31,7 +31,7 @@ const APPROVED_EXACT_PATHS = new Set([
   "tests/content.test.mjs",
   "tests/controller.test.mjs",
   "tests/time.test.mjs",
-  "assets/lunar-drive.opus",
+  "assets/has-to-be.opus",
   "assets/social-preview.png",
   "assets/favicon.svg",
 ]);
@@ -69,7 +69,7 @@ const NETWORK_API_NAMES = new Set([
 ]);
 const DEPLOYED_SOURCE_PATHS = new Set([
   "assets/favicon.svg",
-  "assets/lunar-drive.opus",
+  "assets/has-to-be.opus",
   "assets/social-preview.png",
   "index.html",
   "script.js",
@@ -118,15 +118,162 @@ export function validateTrackedEntries(entries) {
   return errors;
 }
 
+function extractOggPackets(input) {
+  const bytes = Buffer.from(input);
+  const packets = [];
+  const serials = new Set();
+  let pending = [];
+  let pendingLength = 0;
+  let offset = 0;
+
+  while (offset < bytes.length) {
+    if (
+      offset + 27 > bytes.length ||
+      bytes.subarray(offset, offset + 4).toString("ascii") !== "OggS" ||
+      bytes[offset + 4] !== 0
+    ) {
+      throw new Error("Malformed Ogg page");
+    }
+
+    const segmentCount = bytes[offset + 26];
+    const tableStart = offset + 27;
+    const dataStart = tableStart + segmentCount;
+    if (dataStart > bytes.length) throw new Error("Malformed Ogg segment table");
+
+    const lacingValues = bytes.subarray(tableStart, dataStart);
+    const bodyLength = [...lacingValues].reduce(
+      (total, value) => total + value,
+      0,
+    );
+    const pageEnd = dataStart + bodyLength;
+    if (pageEnd > bytes.length) throw new Error("Truncated Ogg page");
+
+    serials.add(bytes.readUInt32LE(offset + 14));
+    let cursor = dataStart;
+    for (const segmentLength of lacingValues) {
+      pending.push(bytes.subarray(cursor, cursor + segmentLength));
+      pendingLength += segmentLength;
+      cursor += segmentLength;
+      if (segmentLength < 255) {
+        packets.push(Buffer.concat(pending, pendingLength));
+        pending = [];
+        pendingLength = 0;
+      }
+    }
+    offset = pageEnd;
+  }
+
+  if (pendingLength !== 0) throw new Error("Truncated Ogg packet");
+  return { packets, serials };
+}
+
+function parseOpusTagsPacket(packet) {
+  if (packet.subarray(0, 8).toString("ascii") !== "OpusTags") {
+    throw new Error("Missing OpusTags packet");
+  }
+
+  let offset = 8;
+  function readLength() {
+    if (offset + 4 > packet.length) throw new Error("Truncated OpusTags length");
+    const value = packet.readUInt32LE(offset);
+    offset += 4;
+    return value;
+  }
+
+  const vendorLength = readLength();
+  if (offset + vendorLength > packet.length) {
+    throw new Error("Truncated OpusTags vendor");
+  }
+  offset += vendorLength;
+
+  const commentCount = readLength();
+  const comments = [];
+  for (let index = 0; index < commentCount; index += 1) {
+    const length = readLength();
+    if (offset + length > packet.length) {
+      throw new Error("Truncated OpusTags comment");
+    }
+    comments.push(packet.subarray(offset, offset + length).toString("utf8"));
+    offset += length;
+  }
+  return comments;
+}
+
+export function validateOpusTagComments(comments) {
+  const errors = [];
+  const allowedKeys = new Set(["title", "artist", "encoder"]);
+  const values = new Map();
+
+  for (const comment of comments) {
+    const separator = comment.indexOf("=");
+    if (separator <= 0) {
+      errors.push("Malformed soundtrack metadata comment");
+      continue;
+    }
+
+    const key = comment.slice(0, separator).trim().toLowerCase();
+    const value = comment.slice(separator + 1);
+    const existing = values.get(key) || [];
+    existing.push(value);
+    values.set(key, existing);
+
+    if (!allowedKeys.has(key)) {
+      errors.push("Unapproved soundtrack metadata tag: " + key);
+    }
+    if (/https?:\/\/|www\./i.test(value)) {
+      errors.push("Soundtrack metadata contains URL");
+    }
+  }
+
+  if (
+    values.get("title")?.length !== 1 ||
+    values.get("title")[0] !== "Has to Be"
+  ) {
+    errors.push("Soundtrack title metadata mismatch");
+  }
+  if (
+    values.get("artist")?.length !== 1 ||
+    values.get("artist")[0] !== "Capzlock"
+  ) {
+    errors.push("Soundtrack artist metadata mismatch");
+  }
+  if ((values.get("encoder")?.length || 0) > 1) {
+    errors.push("Duplicate soundtrack encoder metadata");
+  }
+  return errors;
+}
+
 export function validateSoundtrack(bytes) {
   const errors = [];
-  if (bytes.length > MAX_SOUNDTRACK_BYTES) {
+  const buffer = Buffer.from(bytes);
+
+  if (buffer.length > MAX_SOUNDTRACK_BYTES) {
     errors.push("Soundtrack exceeds size limit");
   }
-  if (Buffer.from(bytes.subarray(0, 4)).toString("ascii") !== "OggS") {
+  if (buffer.subarray(0, 4).toString("ascii") !== "OggS") {
     errors.push("Soundtrack is not an Ogg/Opus container");
+  } else {
+    try {
+      const { packets, serials } = extractOggPackets(buffer);
+      if (serials.size !== 1) {
+        errors.push("Soundtrack must contain exactly one Ogg logical stream");
+      }
+      if (packets[0]?.subarray(0, 8).toString("ascii") !== "OpusHead") {
+        errors.push("Soundtrack is missing an OpusHead packet");
+      }
+      if (!packets[1]) {
+        errors.push("Soundtrack is missing an OpusTags packet");
+      } else {
+        errors.push(
+          ...validateOpusTagComments(parseOpusTagsPacket(packets[1])),
+        );
+      }
+    } catch {
+      errors.push("Soundtrack Ogg structure is malformed");
+    }
   }
-  const digest = createHash("sha256").update(bytes).digest("hex");
+
+  const digest = createHash("sha256").update(buffer).digest("hex");
   if (digest !== SOUNDTRACK_SHA256) {
     errors.push("Soundtrack SHA-256 mismatch");
   }

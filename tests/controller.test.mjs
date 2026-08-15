@@ -204,7 +204,7 @@ test("renders the initial soundtrack control state", () => {
     accessibleLabel: "Play soundtrack",
     icon: "🎵",
     pressed: "false",
-    status: "Tap 🎵 to start Lunar Drive.",
+    status: "Tap 🎵 to start Has to Be.",
   });
 });
 
@@ -225,7 +225,7 @@ test("shows Pause while initial soundtrack playback is pending", async () => {
     accessibleLabel: "Pause soundtrack",
     icon: "⏸",
     pressed: "true",
-    status: "Tap 🎵 to start Lunar Drive.",
+    status: "Tap 🎵 to start Has to Be.",
   });
 
   releaseStart();
@@ -234,7 +234,7 @@ test("shows Pause while initial soundtrack playback is pending", async () => {
     accessibleLabel: "Pause soundtrack",
     icon: "⏸",
     pressed: "true",
-    status: "Lunar Drive — Mondo Loops",
+    status: "Has to Be — Capzlock",
   });
 });
 
@@ -253,7 +253,7 @@ test("plays, pauses, and resumes the soundtrack through the visible control", as
     accessibleLabel: "Pause soundtrack",
     icon: "⏸",
     pressed: "true",
-    status: "Lunar Drive — Mondo Loops",
+    status: "Has to Be — Capzlock",
   });
 
   await elements.musicButton.click();
@@ -261,7 +261,7 @@ test("plays, pauses, and resumes the soundtrack through the visible control", as
     accessibleLabel: "Resume soundtrack",
     icon: "▶",
     pressed: "false",
-    status: "Lunar Drive — Mondo Loops · Paused",
+    status: "Has to Be — Capzlock · Paused",
   });
 
   await elements.musicButton.click();
@@ -269,7 +269,7 @@ test("plays, pauses, and resumes the soundtrack through the visible control", as
     accessibleLabel: "Pause soundtrack",
     icon: "⏸",
     pressed: "true",
-    status: "Lunar Drive — Mondo Loops",
+    status: "Has to Be — Capzlock",
   });
 });
 
@@ -293,7 +293,7 @@ test("keeps Pause available while soundtrack resume is pending", async () => {
     accessibleLabel: "Pause soundtrack",
     icon: "⏸",
     pressed: "true",
-    status: "Lunar Drive — Mondo Loops",
+    status: "Has to Be — Capzlock",
   });
 
   await elements.musicButton.click();
@@ -306,7 +306,7 @@ test("keeps Pause available while soundtrack resume is pending", async () => {
     accessibleLabel: "Resume soundtrack",
     icon: "▶",
     pressed: "false",
-    status: "Lunar Drive — Mondo Loops · Paused",
+    status: "Has to Be — Capzlock · Paused",
   });
   assert.ok(elements.audioChannels.every((channel) => channel.paused));
 });
@@ -327,7 +327,7 @@ test("reflects an external active-channel pause through the visible control", as
     accessibleLabel: "Resume soundtrack",
     icon: "▶",
     pressed: "false",
-    status: "Lunar Drive — Mondo Loops · Paused",
+    status: "Has to Be — Capzlock · Paused",
   });
   assert.ok(elements.audioChannels.every((channel) => channel.paused));
 });
@@ -347,7 +347,7 @@ test("reflects a fatal media error through the visible control", async () => {
     accessibleLabel: "Retry soundtrack",
     icon: "↻",
     pressed: "false",
-    status: "Lunar Drive couldn’t start. Tap to try again.",
+    status: "Has to Be couldn’t start. Tap to try again.",
   });
   assert.ok(elements.audioChannels.every((channel) => channel.paused));
   assert.ok(
@@ -370,7 +370,7 @@ test("offers retry copy after an error and retries playback", async () => {
     accessibleLabel: "Retry soundtrack",
     icon: "↻",
     pressed: "false",
-    status: "Lunar Drive couldn’t start. Tap to try again.",
+    status: "Has to Be couldn’t start. Tap to try again.",
   });
 
   await elements.musicButton.click();
@@ -378,7 +378,7 @@ test("offers retry copy after an error and retries playback", async () => {
     accessibleLabel: "Pause soundtrack",
     icon: "⏸",
     pressed: "true",
-    status: "Lunar Drive — Mondo Loops",
+    status: "Has to Be — Capzlock",
   });
 });
 

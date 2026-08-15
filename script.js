@@ -299,37 +299,37 @@ export function initSite({
         accessibleLabel: "Play soundtrack",
         icon: "🎵",
         pressed: "false",
-        status: "Tap 🎵 to start Lunar Drive.",
+        status: "Tap 🎵 to start Has to Be.",
       },
       starting: {
         accessibleLabel: "Pause soundtrack",
         icon: "⏸",
         pressed: "true",
-        status: "Tap 🎵 to start Lunar Drive.",
+        status: "Tap 🎵 to start Has to Be.",
       },
       playing: {
         accessibleLabel: "Pause soundtrack",
         icon: "⏸",
         pressed: "true",
-        status: "Lunar Drive — Mondo Loops",
+        status: "Has to Be — Capzlock",
       },
       resuming: {
         accessibleLabel: "Pause soundtrack",
         icon: "⏸",
         pressed: "true",
-        status: "Lunar Drive — Mondo Loops",
+        status: "Has to Be — Capzlock",
       },
       paused: {
         accessibleLabel: "Resume soundtrack",
         icon: "▶",
         pressed: "false",
-        status: "Lunar Drive — Mondo Loops · Paused",
+        status: "Has to Be — Capzlock · Paused",
       },
       error: {
         accessibleLabel: "Retry soundtrack",
         icon: "↻",
         pressed: "false",
-        status: "Lunar Drive couldn’t start. Tap to try again.",
+        status: "Has to Be couldn’t start. Tap to try again.",
       },
     };
     const view = views[state];
