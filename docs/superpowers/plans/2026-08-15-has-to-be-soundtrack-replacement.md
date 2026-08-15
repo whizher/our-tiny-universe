@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Replace the active “Lunar Drive — Mondo Loops” soundtrack with the user-supplied “Has to Be — Capzlock” Opus audio, preserve the existing playback/crossfade behavior at a 50% default volume, and keep the public asset privacy-bounded and deterministically validated.
+**Goal:** Replace the active “Lunar Drive — Mondo Loops” soundtrack with the user-supplied “Has to Be — Capzlock” Opus audio while preserving the existing 50% default volume, two-channel five-second equal-power loop crossfade, accessibility behavior, privacy boundary, and deterministic GitHub Pages build.
 
-**Architecture:** Keep the existing two-channel soundtrack controller in `src/audio.mjs` unchanged. Sanitize the supplied Ogg/Opus container once with an audio stream-copy, activate the new local `assets/has-to-be.opus` path everywhere, and strengthen the existing validator so the committed asset is size-bounded, SHA-256 pinned, structurally Opus, and limited to clean title/artist/encoder metadata. Update only the active player copy and README; historical Lunar Drive spec/plan documents stay untouched.
+**Architecture:** Keep `src/audio.mjs` unchanged. Sanitize the supplied Ogg/Opus container once with an Opus stream-copy, activate only `assets/has-to-be.opus`, strengthen `scripts/validate.mjs` so the committed asset is size-bounded, SHA-256 pinned, structurally Opus, and limited to approved metadata, then update the active player/README identity copy. Historical Lunar Drive specs/plans remain untouched.
 
 **Tech Stack:** Dependency-free JavaScript ES modules, Node.js built-in test runner, existing repository validator/builder, local `ffmpeg`/`ffprobe` only for one-time asset preparation and verification, GitHub Pages.
 
@@ -42,7 +42,7 @@
 - **Modify:** `README.md` — update the active soundtrack feature/credit.
 - **Modify:** `tests/build.test.mjs` — path, size, validator, metadata, markup, and build assertions.
 - **Modify:** `tests/controller.test.mjs` — player-state copy assertions.
-- **Verify only:** `src/audio.mjs`, `tests/audio.test.mjs` — existing 50% target and crossfade behavior should remain unchanged.
+- **Verify only:** `src/audio.mjs`, `tests/audio.test.mjs` — existing 50% target and crossfade behavior must remain unchanged.
 - **Do not modify:** historical files under `docs/superpowers/specs/2026-08-09-*soundtrack*` and `docs/superpowers/plans/2026-08-09-*soundtrack*`.
 
 ---
@@ -58,13 +58,13 @@
 - Modify: `tests/build.test.mjs`
 
 **Interfaces:**
-- Consumes: the supplied source file `/mnt/data/Has to Be - Capzlock ( Instrumental Loop ｜ SLOWED + Reverb to Perfection.opus`.
-- Produces: `assets/has-to-be.opus`, an Ogg/Opus file under 5 MiB whose audio packet stream matches the supplied source; `validateSoundtrack(bytes): string[]`; `validateOpusTagComments(comments): string[]`.
-- Preserves: `src/audio.mjs`, all player control semantics, exact production artifact count, and the existing local-only runtime boundary.
+- Consumes: `/mnt/data/Has to Be - Capzlock ( Instrumental Loop ｜ SLOWED + Reverb to Perfection.opus`.
+- Produces: `assets/has-to-be.opus`; `validateSoundtrack(bytes): string[]`; `validateOpusTagComments(comments): string[]`.
+- Preserves: all player control semantics and the exact 10-file production artifact boundary.
 
-- [ ] **Step 1: Update the build/validator tests first so the old production asset becomes RED**
+- [ ] **Step 1: Write the replacement-path and metadata-policy tests first**
 
-In `tests/build.test.mjs`, extend the validator import:
+In `tests/build.test.mjs`, replace the validator import with:
 
 ```js
 import {
@@ -74,31 +74,27 @@ import {
 } from "../scripts/validate.mjs";
 ```
 
-In `validateFixture()`, replace the fixture soundtrack path and copy source:
+In `validateFixture()`, change the fixture soundtrack to the new path:
 
 ```js
 const soundtrackPath = join(assetsDirectory, "has-to-be.opus");
 ```
 
+and:
+
 ```js
 cp("assets/has-to-be.opus", soundtrackPath),
 ```
 
-In the exact approved-path test, replace:
-
-```js
-"assets/lunar-drive.opus",
-```
-
-with:
+In the exact approved-path test, replace `assets/lunar-drive.opus` with:
 
 ```js
 "assets/has-to-be.opus",
 ```
 
-Keep the approved-path count at `20` because one soundtrack path replaces one soundtrack path.
+Keep the approved-path count at `20`.
 
-Replace the approved-public-assets assertion with:
+Replace the soundtrack portion of the approved-assets test with:
 
 ```js
 assert.deepEqual(
@@ -122,7 +118,7 @@ assert.deepEqual(
 );
 ```
 
-Replace the soundtrack-size boundary portion of the byte-limit test with the exact 5 MiB boundary:
+Replace the soundtrack byte-limit assertions with the exact 5 MiB boundary:
 
 ```js
 assert.deepEqual(
@@ -147,15 +143,15 @@ assert.deepEqual(
 );
 ```
 
-In the soundtrack markup test, change only the two-channel source assertion for this task:
+In the existing soundtrack-markup test, change only the channel source assertion for this task:
 
 ```js
 assert.match(channel, /src="assets\/has-to-be\.opus"/);
 ```
 
-Leave the old hint assertion temporarily unchanged; Task 2 owns user-visible soundtrack naming.
+Leave its old visible hint assertion unchanged until Task 2.
 
-In the build artifact test, replace the old path in the exact file list:
+In the build-artifact test, replace the old soundtrack path in the exact file list with:
 
 ```js
 "assets/has-to-be.opus",
@@ -170,7 +166,7 @@ assert.deepEqual(
 );
 ```
 
-Add these metadata-policy tests near the existing soundtrack validator tests:
+Add these tests near the existing soundtrack validator tests:
 
 ```js
 test("soundtrack metadata policy permits only clean identity tags", () => {
@@ -208,9 +204,9 @@ test("validator accepts the committed sanitized soundtrack", async () => {
 });
 ```
 
-Keep the existing modified-soundtrack fixture test; after the fixture path update it should continue proving the SHA pin rejects one-byte changes.
+Keep the existing modified-soundtrack fixture test; after the fixture-path replacement it must still prove that a one-byte mutation produces `Soundtrack SHA-256 mismatch`.
 
-- [ ] **Step 2: Run the focused tests to verify RED before changing production files**
+- [ ] **Step 2: Run the focused tests to verify RED**
 
 Run:
 
@@ -220,11 +216,11 @@ node --test \
   tests/build.test.mjs
 ```
 
-Expected: FAIL because `validateOpusTagComments` does not exist yet, the approved path is still `assets/lunar-drive.opus`, and `assets/has-to-be.opus` has not been created.
+Expected: FAIL because `validateOpusTagComments` does not exist, the validator still approves the Lunar Drive path, and `assets/has-to-be.opus` does not exist.
 
 - [ ] **Step 3: Create the sanitized asset with an Opus stream-copy**
 
-From the repository root, set the source path and create the new asset:
+Run from the repository root:
 
 ```bash
 SOURCE='/mnt/data/Has to Be - Capzlock ( Instrumental Loop ｜ SLOWED + Reverb to Perfection.opus'
@@ -239,38 +235,33 @@ ffmpeg -hide_banner -loglevel error \
   assets/has-to-be.opus
 ```
 
-Do not use `libopus`, a bitrate flag, a filter, resampling, normalization, or any other re-encoding option.
+Do not use `libopus`, bitrate flags, filters, resampling, normalization, or any other re-encoding option.
 
 - [ ] **Step 4: Verify the sanitized asset before pinning it**
 
-Inspect source and sanitized streams:
+Run:
 
 ```bash
-ffprobe -v error \
-  -show_entries stream=index,codec_name,codec_type,sample_rate,channels:stream_tags \
-  -of json \
-  "$SOURCE"
-
 ffprobe -v error \
   -show_entries stream=index,codec_name,codec_type,sample_rate,channels:stream_tags \
   -of json \
   assets/has-to-be.opus
 ```
 
-Expected for `assets/has-to-be.opus`:
+Expected:
 
 - exactly one stream;
-- `codec_name` is `opus`;
-- `codec_type` is `audio`;
-- sample rate is `48000`;
-- channels is `2`;
-- title is `Has to Be`;
-- artist is `Capzlock`;
-- an `encoder` tag is allowed;
+- `codec_name: opus`;
+- `codec_type: audio`;
+- sample rate `48000`;
+- `2` channels;
+- title `Has to Be`;
+- artist `Capzlock`;
+- optional encoder tag only;
 - no MJPEG/video stream;
-- no `METADATA_BLOCK_PICTURE`, `purl`, `synopsis`, `DESCRIPTION`, album, genre, or source URL tag.
+- no `METADATA_BLOCK_PICTURE`, `purl`, `synopsis`, `DESCRIPTION`, album, genre, or source URL metadata.
 
-Verify that the compressed audio packets are byte-identical across the remux:
+Prove the compressed audio packet stream was copied rather than re-encoded:
 
 ```bash
 ffmpeg -v error -i "$SOURCE" -map 0:a:0 -c:a copy -f hash -hash sha256 -
@@ -283,36 +274,27 @@ Expected from both commands:
 SHA256=7ea3aaa7a8228b73706bfd13f6ee88c4cd13a1e72cb6e5017deec4285076e0f0
 ```
 
-Verify the size ceiling:
+Check the size and compute the exact container hash:
 
 ```bash
 SIZE=$(stat -c '%s' assets/has-to-be.opus)
 printf '%s\n' "$SIZE"
 test "$SIZE" -lt 5242880
+DIGEST=$(sha256sum assets/has-to-be.opus | awk '{print $1}')
+printf '%s\n' "$DIGEST"
+test "${#DIGEST}" -eq 64
 ```
 
-A planning-environment remux was `4,352,134` bytes; the exact Ogg container bytes may differ with muxer version, so only the `< 5,242,880` requirement is normative.
+The planning-environment remux was `4,352,134` bytes with container digest `dd2f4064a1648f6cf7f2ecd4306381e13eddc3fd00dbd17222cc8cffcda07e56`. Those are useful cross-checks, but the exact execution asset’s digest is the one to pin after all checks above pass.
 
-Finally compute the exact container digest that will be pinned:
+- [ ] **Step 5: Update `scripts/validate.mjs` for the new path and 5 MiB ceiling**
 
-```bash
-sha256sum assets/has-to-be.opus
-```
-
-Record the 64-hex digest printed for the exact file that will be committed. On the planning environment the exploratory remux digest was `dd2f4064a1648f6cf7f2ecd4306381e13eddc3fd00dbd17222cc8cffcda07e56`; if execution produces different container bytes, pin the execution asset’s digest after the stream/metadata checks above rather than forcing the exploratory digest.
-
-- [ ] **Step 5: Strengthen `scripts/validate.mjs` for the replacement asset and clean Opus tags**
-
-Replace the soundtrack constants with:
+Set:
 
 ```js
 const MAX_SOUNDTRACK_BYTES = 5 * 1024 * 1024;
 const SOUNDTRACK_PATH = "assets/has-to-be.opus";
-const SOUNDTRACK_SHA256 =
-  "<the exact 64-hex digest printed by sha256sum in Step 4>";
 ```
-
-The value in `SOUNDTRACK_SHA256` must be the literal digest from Step 4 before this task is committed; do not leave angle brackets or temporary text in the file.
 
 Replace `assets/lunar-drive.opus` with `assets/has-to-be.opus` in both `APPROVED_EXACT_PATHS` and `DEPLOYED_SOURCE_PATHS`.
 
@@ -445,7 +427,7 @@ export function validateOpusTagComments(comments) {
 }
 ```
 
-Then replace `validateSoundtrack()` with this implementation, preserving the size and SHA checks while adding structural/tag validation:
+Replace `validateSoundtrack()` with:
 
 ```js
 export function validateSoundtrack(bytes) {
@@ -486,11 +468,43 @@ export function validateSoundtrack(bytes) {
 }
 ```
 
-This keeps CI dependency-free: `ffprobe` is only a one-time preparation check; the committed asset’s structure/tags are enforced by Node plus the exact SHA pin thereafter.
+- [ ] **Step 6: Pin the exact container digest without leaving a temporary value**
 
-- [ ] **Step 6: Cut the active production path over to `assets/has-to-be.opus`**
+Run this immediately after the validator edits while `$DIGEST` still contains the Step 4 result:
 
-In `scripts/build-site.mjs`, replace the old soundtrack copy with:
+```bash
+python3 - "$DIGEST" <<'PY'
+from pathlib import Path
+import re
+import sys
+
+path = Path("scripts/validate.mjs")
+source = path.read_text()
+digest = sys.argv[1]
+updated, count = re.subn(
+    r'const SOUNDTRACK_SHA256 =\n\s+"[0-9a-f]{64}";',
+    f'const SOUNDTRACK_SHA256 =\n  "{digest}";',
+    source,
+    count=1,
+)
+if count != 1:
+    raise SystemExit("expected exactly one existing SOUNDTRACK_SHA256 constant")
+path.write_text(updated)
+PY
+```
+
+Then verify the literal pin is present and matches the asset:
+
+```bash
+grep -A1 'const SOUNDTRACK_SHA256' scripts/validate.mjs
+sha256sum assets/has-to-be.opus
+```
+
+Expected: the same 64-hex digest appears in both places. No temporary marker is written to the source file at any point.
+
+- [ ] **Step 7: Cut the production asset path over**
+
+In `scripts/build-site.mjs`, use:
 
 ```js
 await cp(
@@ -499,21 +513,21 @@ await cp(
 );
 ```
 
-In `index.html`, change both hidden audio elements to:
+In both hidden `<audio>` elements in `index.html`, set:
 
 ```html
 src="assets/has-to-be.opus"
 ```
 
-Do not change the visible soundtrack hint yet; Task 2 owns all user-facing identity copy.
+Do not change the visible hint yet; Task 2 owns soundtrack identity copy.
 
-Remove the superseded asset:
+Remove the old asset:
 
 ```bash
 rm assets/lunar-drive.opus
 ```
 
-- [ ] **Step 7: Run the focused build/validator tests to verify GREEN**
+- [ ] **Step 8: Run the focused tests and builder to verify GREEN**
 
 Run:
 
@@ -525,15 +539,9 @@ node scripts/validate.mjs
 node scripts/build-site.mjs
 ```
 
-Expected:
+Expected: all focused tests pass, validator exits `0`, build exits `0`, `_site/assets/has-to-be.opus` exists, and `_site/assets/lunar-drive.opus` does not exist.
 
-- focused tests PASS;
-- validator exits `0` and still reports the same approved runtime-file count;
-- build exits `0`;
-- `_site/assets/has-to-be.opus` exists;
-- `_site/assets/lunar-drive.opus` does not exist.
-
-- [ ] **Step 8: Review the asset/policy diff and commit Task 1**
+- [ ] **Step 9: Review and commit Task 1**
 
 Run:
 
@@ -543,7 +551,7 @@ git diff -- scripts/validate.mjs scripts/build-site.mjs index.html tests/build.t
 git status --short
 ```
 
-The binary diff should show `assets/has-to-be.opus` added and `assets/lunar-drive.opus` deleted. No unrelated runtime file should change.
+Expected binary changes: `assets/has-to-be.opus` added and `assets/lunar-drive.opus` deleted. No unrelated runtime file changes.
 
 Commit:
 
@@ -560,7 +568,7 @@ git commit -m "feat: replace public soundtrack asset"
 
 ---
 
-### Task 2: Update active soundtrack identity copy and preserve the 50% controller behavior
+### Task 2: Update active soundtrack identity copy and verify the existing 50% controller
 
 **Files:**
 - Modify: `tests/controller.test.mjs`
@@ -571,13 +579,13 @@ git commit -m "feat: replace public soundtrack asset"
 - Verify only: `src/audio.mjs`, `tests/audio.test.mjs`
 
 **Interfaces:**
-- Consumes: the replacement asset/path from Task 1 and the existing `createCrossfadeController()` API.
+- Consumes: `assets/has-to-be.opus` and the existing `createCrossfadeController()` API.
 - Produces: exact active UI copy for “Has to Be — Capzlock”.
-- Preserves: `DEFAULT_TARGET_VOLUME = 0.5`, equal-power crossfade math, playback state machine, control layout, and all unrelated site behavior.
+- Preserves: `DEFAULT_TARGET_VOLUME = 0.5`, equal-power crossfade math, playback state machine, and control layout.
 
-- [ ] **Step 1: Update player-copy tests first to verify RED**
+- [ ] **Step 1: Update player-copy tests first**
 
-In `tests/controller.test.mjs`, replace the expected active soundtrack strings as follows:
+In `tests/controller.test.mjs`, replace only soundtrack-control expected strings:
 
 ```text
 Tap 🎵 to start Lunar Drive.
@@ -593,15 +601,13 @@ Lunar Drive couldn’t start. Tap to try again.
 → Has to Be couldn’t start. Tap to try again.
 ```
 
-Apply those replacements only to soundtrack-control assertions; do not touch unrelated tests.
-
-In the soundtrack markup test in `tests/build.test.mjs`, replace the temporary old hint assertion with:
+In the soundtrack-markup test in `tests/build.test.mjs`, replace the temporary old hint assertion with:
 
 ```js
 assert.match(html, /Tap 🎵 to start Has to Be\./);
 ```
 
-Add a focused README assertion:
+Add:
 
 ```js
 test("active documentation credits only the replacement soundtrack", async () => {
@@ -611,7 +617,7 @@ test("active documentation credits only the replacement soundtrack", async () =>
 });
 ```
 
-- [ ] **Step 2: Run the identity-copy tests to verify RED**
+- [ ] **Step 2: Run identity-copy tests to verify RED**
 
 Run:
 
@@ -621,17 +627,17 @@ node --test \
   tests/controller.test.mjs tests/build.test.mjs
 ```
 
-Expected: FAIL because `index.html`, `script.js`, and `README.md` still display Lunar Drive / Mondo Loops.
+Expected: FAIL because `index.html`, `script.js`, and `README.md` still name Lunar Drive / Mondo Loops.
 
-- [ ] **Step 3: Update the active player copy in `index.html` and `script.js`**
+- [ ] **Step 3: Update active player copy only**
 
-In `index.html`, set the initial status text to:
+In `index.html`, set the status text to:
 
 ```html
 Tap 🎵 to start Has to Be.
 ```
 
-In `script.js`, keep the existing `renderMusicState()` structure and change only its status strings:
+In `script.js`, keep `renderMusicState()` structurally unchanged and use these status strings:
 
 ```js
 idle: {
@@ -672,11 +678,11 @@ error: {
 },
 ```
 
-Do not pass a new `targetVolume` argument into `createCrossfadeController()`. The controller already defaults to `0.5`; changing the call site would be redundant and would create two sources of truth.
+Do not pass a new `targetVolume` into `createCrossfadeController()`. The controller already defaults to `0.5`; keep one source of truth.
 
 - [ ] **Step 4: Update the active README credit only**
 
-In the Features list, replace the old soundtrack bullet with:
+Replace the soundtrack feature bullet with:
 
 ```markdown
 - Optional local “Has to Be” soundtrack with manual play/pause and a five-second crossfade loop
@@ -688,7 +694,7 @@ Replace the active Soundtrack section body with:
 “Has to Be” is by Capzlock and is included here with permission. Playback is optional, starts only after a visitor presses Play, and makes no third-party request.
 ```
 
-Do not edit the historical soundtrack design/plan documents.
+Do not edit historical soundtrack specs/plans.
 
 - [ ] **Step 5: Run focused copy tests to verify GREEN**
 
@@ -702,23 +708,16 @@ node --test \
 
 Expected: PASS.
 
-- [ ] **Step 6: Re-run the existing 50% and crossfade controller tests without changing controller code**
+- [ ] **Step 6: Re-run the existing 50%/crossfade tests without changing controller code**
 
 Run:
 
 ```bash
 node --test tests/audio.test.mjs
-```
-
-Expected: PASS, including the existing assertions that the default equal-power target is `0.5`, the active channel starts at `0.5`, and the five-second crossfade scales both channels to the same target.
-
-Confirm no controller implementation diff exists:
-
-```bash
 git diff -- src/audio.mjs
 ```
 
-Expected: no output.
+Expected: audio tests PASS, including the existing default-target assertions for `0.5`; `git diff -- src/audio.mjs` prints nothing.
 
 - [ ] **Step 7: Review and commit Task 2**
 
@@ -739,7 +738,7 @@ git commit -m "feat: update soundtrack identity"
 
 ---
 
-### Task 3: Run full verification, prove stale production references are gone, and open the PR
+### Task 3: Run full verification and open an unmerged PR
 
 **Files:**
 - Verify all files changed by Tasks 1–2.
@@ -747,10 +746,9 @@ git commit -m "feat: update soundtrack identity"
 
 **Interfaces:**
 - Consumes: completed Task 1 and Task 2 commits.
-- Produces: a fully verified feature branch and an unmerged pull request ready for explicit user approval.
-- Preserves: production behavior outside the soundtrack replacement.
+- Produces: a fully verified feature branch and an unmerged PR ready for explicit user approval.
 
-- [ ] **Step 1: Run the complete automated suite and repository validator**
+- [ ] **Step 1: Run the complete automated suite and validator**
 
 Run:
 
@@ -759,7 +757,7 @@ node --test tests/*.test.mjs
 node scripts/validate.mjs
 ```
 
-Expected: every test passes and validator exits `0` with no privacy, path, size, metadata, hash, or runtime-reference errors.
+Expected: every test passes; validator exits `0` with no privacy, path, size, metadata, hash, or runtime-reference errors.
 
 - [ ] **Step 2: Build and verify the exact production artifact boundary**
 
@@ -785,16 +783,17 @@ src/time.mjs
 styles.css
 ```
 
-Verify the soundtrack is copied byte-for-byte:
+Verify byte identity and SHA pin:
 
 ```bash
 cmp assets/has-to-be.opus _site/assets/has-to-be.opus
 sha256sum assets/has-to-be.opus _site/assets/has-to-be.opus
+grep -A1 'const SOUNDTRACK_SHA256' scripts/validate.mjs
 ```
 
-Expected: `cmp` exits `0`; both SHA-256 values are identical and equal the literal `SOUNDTRACK_SHA256` value committed in `scripts/validate.mjs`.
+Expected: `cmp` exits `0`; both hashes are identical and equal the literal validator pin.
 
-- [ ] **Step 3: Re-check the committed audio stream and metadata**
+- [ ] **Step 3: Re-check audio structure, metadata, and stream-copy identity**
 
 Run:
 
@@ -805,9 +804,9 @@ ffprobe -v error \
   assets/has-to-be.opus
 ```
 
-Expected: one stereo 48 kHz Opus audio stream; `title=Has to Be`; `artist=Capzlock`; optional encoder tag only; no image/video stream and no source URL/description/artwork metadata.
+Expected: one stereo 48 kHz Opus audio stream; title `Has to Be`; artist `Capzlock`; optional encoder tag only; no image/video stream and no source URL/description/artwork metadata.
 
-Re-confirm the compressed audio packet hash against the user-supplied source:
+Re-check packet identity:
 
 ```bash
 SOURCE='/mnt/data/Has to Be - Capzlock ( Instrumental Loop ｜ SLOWED + Reverb to Perfection.opus'
@@ -815,15 +814,15 @@ ffmpeg -v error -i "$SOURCE" -map 0:a:0 -c:a copy -f hash -hash sha256 -
 ffmpeg -v error -i assets/has-to-be.opus -map 0:a:0 -c:a copy -f hash -hash sha256 -
 ```
 
-Expected from both commands:
+Expected from both:
 
 ```text
 SHA256=7ea3aaa7a8228b73706bfd13f6ee88c4cd13a1e72cb6e5017deec4285076e0f0
 ```
 
-- [ ] **Step 4: Prove there are no stale active Lunar Drive references**
+- [ ] **Step 4: Prove stale active Lunar Drive references are gone**
 
-Search only active production/test/docs surfaces, deliberately excluding historical dated soundtrack specs/plans:
+Search active surfaces only, excluding historical dated soundtrack docs:
 
 ```bash
 grep -RInE \
@@ -834,7 +833,7 @@ grep -RInE \
 
 Expected: no output.
 
-Confirm the historical documents still exist unchanged:
+Confirm historical soundtrack docs are untouched:
 
 ```bash
 git diff main...HEAD -- \
@@ -844,9 +843,9 @@ git diff main...HEAD -- \
 
 Expected: no output.
 
-- [ ] **Step 5: Run local HTTP smoke checks against the built site**
+- [ ] **Step 5: Run local HTTP smoke checks**
 
-Start a temporary server:
+Start the built site:
 
 ```bash
 python3 -m http.server 4173 -d _site >/tmp/our-tiny-universe-http.log 2>&1 &
@@ -854,7 +853,7 @@ SERVER_PID=$!
 trap 'kill "$SERVER_PID" 2>/dev/null || true' EXIT
 ```
 
-Check the page and soundtrack asset:
+Check page and soundtrack delivery:
 
 ```bash
 curl -fsS http://127.0.0.1:4173/ >/tmp/our-tiny-universe-index.html
@@ -862,18 +861,18 @@ curl -fsS http://127.0.0.1:4173/assets/has-to-be.opus >/tmp/our-tiny-universe-so
 cmp assets/has-to-be.opus /tmp/our-tiny-universe-soundtrack.opus
 ```
 
-Expected: both requests succeed and the served soundtrack matches the committed asset byte-for-byte.
+Expected: both requests succeed and the served soundtrack is byte-identical.
 
-Stop the server when finished:
+Stop the server:
 
 ```bash
 kill "$SERVER_PID"
 trap - EXIT
 ```
 
-Browser-level manual playback is a post-merge/live-site verification item; do not claim it from these HTTP checks alone.
+Do not claim browser playback from HTTP checks alone.
 
-- [ ] **Step 6: Review the final branch diff and scope**
+- [ ] **Step 6: Review final scope**
 
 Run:
 
@@ -891,7 +890,7 @@ git diff main...HEAD -- \
   tests/controller.test.mjs
 ```
 
-Expected changed implementation surfaces:
+Expected implementation changes:
 
 - `assets/has-to-be.opus` added;
 - `assets/lunar-drive.opus` deleted;
@@ -902,33 +901,33 @@ Expected changed implementation surfaces:
 - `scripts/validate.mjs`;
 - `tests/build.test.mjs`;
 - `tests/controller.test.mjs`;
-- this approved replacement spec and implementation plan.
+- the approved replacement spec and this implementation plan.
 
-Expected unchanged runtime surfaces include `src/audio.mjs`, `src/content.mjs`, `src/time.mjs`, `styles.css`, and unrelated tests/workflows.
+Expected unchanged runtime surfaces include `src/audio.mjs`, `src/content.mjs`, `src/time.mjs`, `styles.css`, and unrelated workflows/tests.
 
-- [ ] **Step 7: Push the verified branch and open an unmerged pull request**
+- [ ] **Step 7: Push and open an unmerged PR**
 
-If executing in a local clone, push the existing branch:
+If execution uses a local clone:
 
 ```bash
 git push -u origin feature/replace-soundtrack-has-to-be
 ```
 
-Open a PR with title:
+PR title:
 
 ```text
 Replace soundtrack with Has to Be
 ```
 
-Use this PR summary:
+PR body:
 
 ```markdown
 ## Summary
 
 - replace the local Lunar Drive soundtrack with the user-approved “Has to Be — Capzlock” Opus asset
 - strip embedded artwork/source metadata while preserving the original compressed audio packets
-- keep the existing manual playback, 50% default volume, and five-second equal-power loop crossfade
-- update deterministic build/validator policy to the new asset path, 5 MiB ceiling, clean metadata policy, and exact SHA-256 pin
+- keep manual playback, 50% default volume, and the five-second equal-power loop crossfade
+- update deterministic build/validator policy to the new path, 5 MiB ceiling, clean metadata policy, and exact SHA-256 pin
 - update active player/README credit without changing unrelated site behavior
 
 ## Verification
@@ -939,7 +938,7 @@ Use this PR summary:
 - soundtrack build copy is byte-identical to the committed asset
 - source and sanitized soundtrack audio packet hashes match
 - sanitized asset is one stereo 48 kHz Opus audio stream with clean title/artist metadata and no embedded artwork/source URLs
-- no stale Lunar Drive production/test references remain
+- no stale Lunar Drive active references remain
 - local HTTP page/asset smoke checks pass
 
 ## Merge gate
@@ -947,10 +946,10 @@ Use this PR summary:
 Do not merge without explicit user approval.
 ```
 
-Do **not** merge the PR. Hand back the PR number, exact head SHA, CI state, and verification summary for user approval.
+Do **not** merge. Hand back the PR number, exact head SHA, CI state, and verification summary for user approval.
 
 ---
 
 ## Post-merge verification (only after separate explicit merge approval)
 
-After an approved merge, verify the first GitHub Pages run on the exact merge SHA, then verify the live page serves `assets/has-to-be.opus`. A real browser/manual check must confirm the visible credit, explicit-start playback, pause/resume, 50% target behavior as observable through the existing controller, and a smooth five-second loop transition. If deployment or playback is not freshly verified, report that limitation rather than inferring success from CI alone.
+After an approved merge, verify the first GitHub Pages run on the exact merge SHA, then verify the live page serves `assets/has-to-be.opus`. A real browser/manual check must confirm the visible credit, explicit-start playback, pause/resume, 50% target behavior through the existing controller, and a smooth five-second loop transition. If deployment or playback is not freshly verified, report that limitation rather than inferring success from CI alone.
