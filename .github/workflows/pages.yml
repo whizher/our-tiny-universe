@@ -1,24 +1,14 @@
-name: Validate and deploy GitHub Pages
+name: Soundtrack replacement branch verification
 
 on:
   push:
-    branches: ["main"]
-  workflow_dispatch:
+    branches: ["feature/replace-soundtrack-has-to-be"]
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
-
-concurrency:
-  group: pages
-  cancel-in-progress: false
 
 jobs:
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+  verify:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -30,23 +20,33 @@ jobs:
         with:
           node-version: 22
 
-      - name: Run tests
+      - name: Run full tests
         run: node --test tests/*.test.mjs
 
-      - name: Validate runtime references
+      - name: Validate repository
         run: node scripts/validate.mjs
 
       - name: Build public artifact
         run: node scripts/build-site.mjs
 
-      - name: Configure Pages
-        uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5
-
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b # v4
-        with:
-          path: _site
-
-      - name: Deploy
-        id: deployment
-        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4
+      - name: Verify exact artifact inventory and soundtrack bytes
+        shell: bash
+        run: |
+          expected=$(cat <<'EOF'
+          .nojekyll
+          assets/favicon.svg
+          assets/has-to-be.opus
+          assets/social-preview.png
+          index.html
+          script.js
+          src/audio.mjs
+          src/content.mjs
+          src/time.mjs
+          styles.css
+          EOF
+          )
+          actual=$(find _site -type f -printf '%P\n' | sort)
+          test "$actual" = "$expected"
+          cmp assets/has-to-be.opus _site/assets/has-to-be.opus
+          test "$(sha256sum assets/has-to-be.opus | awk '{print $1}')" = "d5fc2e189524fb8228651bc733555a327e9fe2f516fed6c7872f1bfe345a1d5e"
+          ! grep -RInE 'Lunar Drive|Mondo Loops|lunar-drive\.opus' README.md index.html script.js scripts src tests
