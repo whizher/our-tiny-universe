@@ -14,7 +14,11 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
-import { validateTrackedEntries } from "../scripts/validate.mjs";
+import {
+  validateOpusTagComments,
+  validateSoundtrack,
+  validateTrackedEntries,
+} from "../scripts/validate.mjs";
 
 async function listFiles(directory, prefix = "") {
   const entries = await readdir(directory, { withFileTypes: true });
@@ -59,10 +63,10 @@ async function validateFixture({
       typeof indexHtml === "function"
         ? await indexHtml({ fixtureRoot, outsidePath })
         : indexHtml;
-    const soundtrackPath = join(assetsDirectory, "lunar-drive.opus");
+    const soundtrackPath = join(assetsDirectory, "has-to-be.opus");
     await Promise.all([
       cp("assets/favicon.svg", join(assetsDirectory, "favicon.svg")),
-      cp("assets/lunar-drive.opus", soundtrackPath),
+      cp("assets/has-to-be.opus", soundtrackPath),
       cp("scripts/validate.mjs", join(scriptsDirectory, "validate.mjs")),
       timeSource === undefined
         ? cp("src/time.mjs", join(sourceDirectory, "time.mjs"))
@@ -118,7 +122,7 @@ test("repository policy permits every exact approved tracked path", () => {
     "tests/content.test.mjs",
     "tests/controller.test.mjs",
     "tests/time.test.mjs",
-    "assets/lunar-drive.opus",
+    "assets/has-to-be.opus",
     "assets/social-preview.png",
     "assets/favicon.svg",
   ];
@@ -208,7 +212,7 @@ test("repository policy permits only package.json and the three approved public 
   assert.deepEqual(
     validateTrackedEntries([
       { path: "package.json", size: 1 },
-      { path: "assets/lunar-drive.opus", size: 2_932_210 },
+      { path: "assets/has-to-be.opus", size: 4_352_134 },
       { path: "assets/social-preview.png", size: 1 },
       { path: "assets/favicon.svg", size: 1 },
     ]),
@@ -216,6 +220,8 @@ test("repository policy permits only package.json and the three approved public 
   );
   assert.deepEqual(
     validateTrackedEntries([
+      { path: "assets/lunar-drive.opus", size: 1 },
+      { path: "assets/alternate.opus", size: 1 },
       { path: "package-lock.json", size: 1 },
       { path: "data.json", size: 1 },
       { path: "assets/data.json", size: 1 },
@@ -225,6 +231,8 @@ test("repository policy permits only package.json and the three approved public 
       { path: "assets/alternate.svg", size: 1 },
     ]),
     [
+      "Unapproved tracked path: assets/lunar-drive.opus",
+      "Unapproved tracked path: assets/alternate.opus",
       "Unapproved tracked path: package-lock.json",
       "Unapproved tracked path: data.json",
       "Unapproved tracked path: assets/data.json",
@@ -241,7 +249,7 @@ test("repository policy enforces exact text, preview, and soundtrack byte limits
     validateTrackedEntries([
       { path: "script.js", size: 262_144 },
       { path: "assets/social-preview.png", size: 1_048_576 },
-      { path: "assets/lunar-drive.opus", size: 4_194_304 },
+      { path: "assets/has-to-be.opus", size: 5_242_880 },
     ]),
     [],
   );
@@ -249,12 +257,12 @@ test("repository policy enforces exact text, preview, and soundtrack byte limits
     validateTrackedEntries([
       { path: "script.js", size: 262_145 },
       { path: "assets/social-preview.png", size: 1_048_577 },
-      { path: "assets/lunar-drive.opus", size: 4_194_305 },
+      { path: "assets/has-to-be.opus", size: 5_242_881 },
     ]),
     [
       "Tracked file exceeds size limit: script.js",
       "Tracked file exceeds size limit: assets/social-preview.png",
-      "Tracked file exceeds size limit: assets/lunar-drive.opus",
+      "Tracked file exceeds size limit: assets/has-to-be.opus",
     ],
   );
 });
@@ -265,13 +273,13 @@ test("soundtrack markup is local, manual, visible, and duplicated for crossfade"
 
   assert.equal(channels.length, 2);
   for (const channel of channels) {
-    assert.match(channel, /src="assets\/lunar-drive\.opus"/);
+    assert.match(channel, /src="assets\/has-to-be\.opus"/);
     assert.match(channel, /preload="metadata"/);
     assert.doesNotMatch(channel, /\b(?:autoplay|loop)\b/i);
   }
   assert.match(html, /data-music-toggle/);
   assert.match(html, /data-music-status[^>]*aria-live="polite"/);
-  assert.match(html, /Tap 🎵 to start Lunar Drive\./);
+  assert.match(html, /Tap 🎵 to start Has to Be\./);
   const toggle = html.match(
     /<button\b[^>]*data-music-toggle[^>]*>[\s\S]*?<\/button>/,
   )?.[0] || "";
@@ -280,6 +288,12 @@ test("soundtrack markup is local, manual, visible, and duplicated for crossfade"
   assert.match(toggle, />\s*🎵\s*<\/button>/);
   assert.doesNotMatch(toggle, />[^<]*Play soundtrack/);
   assert.doesNotMatch(html, /(?:youtube|spotify|soundcloud)\.com/i);
+});
+
+test("active documentation credits only the replacement soundtrack", async () => {
+  const readme = await readFile("README.md", "utf8");
+  assert.match(readme, /“Has to Be” is by Capzlock/);
+  assert.doesNotMatch(readme, /Lunar Drive|Mondo Loops/);
 });
 
 test("soundtrack control is a compact circle with a separate hint bubble", async () => {
@@ -324,7 +338,7 @@ test("build emits only privacy-bounded public runtime files", async () => {
   assert.deepEqual(files, [
     ".nojekyll",
     "assets/favicon.svg",
-    "assets/lunar-drive.opus",
+    "assets/has-to-be.opus",
     "assets/social-preview.png",
     "index.html",
     "script.js",
@@ -335,8 +349,8 @@ test("build emits only privacy-bounded public runtime files", async () => {
   ]);
 
   assert.deepEqual(
-    await readFile("_site/assets/lunar-drive.opus"),
-    await readFile("assets/lunar-drive.opus"),
+    await readFile("_site/assets/has-to-be.opus"),
+    await readFile("assets/has-to-be.opus"),
   );
 
   const forbidden =
@@ -353,6 +367,40 @@ test("validator permits canonical metadata and local module imports", () => {
   });
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /Validated 8 runtime files\./);
+});
+
+test("soundtrack metadata policy permits only clean identity tags", () => {
+  assert.deepEqual(
+    validateOpusTagComments([
+      "title=Has to Be",
+      "artist=Capzlock",
+      "encoder=Lavf61.7.103",
+    ]),
+    [],
+  );
+});
+
+test("soundtrack metadata policy rejects artwork URLs and source description tags", () => {
+  assert.deepEqual(
+    validateOpusTagComments([
+      "title=Has to Be",
+      "artist=Capzlock",
+      "METADATA_BLOCK_PICTURE=AAAA",
+      "purl=https://www.youtube.com/watch?v=example",
+      "synopsis=source description",
+    ]),
+    [
+      "Unapproved soundtrack metadata tag: metadata_block_picture",
+      "Unapproved soundtrack metadata tag: purl",
+      "Soundtrack metadata contains URL",
+      "Unapproved soundtrack metadata tag: synopsis",
+    ],
+  );
+});
+
+test("validator accepts the committed sanitized soundtrack", async () => {
+  const bytes = await readFile("assets/has-to-be.opus");
+  assert.deepEqual(validateSoundtrack(bytes), []);
 });
 
 test("validator rejects a modified soundtrack", async () => {
@@ -989,18 +1037,18 @@ test("social preview has approved dimensions and size", async () => {
 });
 
 test("soundtrack is the sanitized approved Opus asset", async () => {
-  const bytes = await readFile("assets/lunar-drive.opus");
+  const bytes = await readFile("assets/has-to-be.opus");
   const digest = createHash("sha256").update(bytes).digest("hex");
   const searchable = bytes.toString("latin1");
 
   assert.equal(bytes.subarray(0, 4).toString("ascii"), "OggS");
-  assert.equal(bytes.length, 2_932_210);
+  assert.equal(bytes.length, 4_352_134);
   assert.equal(
     digest,
-    "ba8d55ed26addb68ea68ca4703b96aeee665d429981495db3aee272e04081765",
+    "d5fc2e189524fb8228651bc733555a327e9fe2f516fed6c7872f1bfe345a1d5e",
   );
-  assert.match(searchable, /title=Lunar Drive/);
-  assert.match(searchable, /artist=Mondo Loops/);
+  assert.match(searchable, /title=Has to Be/);
+  assert.match(searchable, /artist=Capzlock/);
   assert.doesNotMatch(
     searchable,
     /https?:\/\/|youtu(?:\.be|be\.com)|lofi girl|description=|metadata_block_picture/i,
