@@ -32,10 +32,12 @@ The current maintenance investigation has already identified viable upstream can
 ## Files expected to change
 
 - `.github/workflows/pages.yml` — checkout/configure-pages/upload-pages-artifact/deploy-pages pins only; setup-node, Node 22, triggers, permissions, timeout, concurrency, artifact path, deployment environment, test/validate/build order, and deployment semantics remain unchanged.
-- `tests/build.test.mjs` — update immutable-pin regression expectations and, where useful, preserve assertions for the existing workflow behavior.
+- `tests/content.test.mjs` — update the existing immutable-pin regression expectations while preserving the content tests and workflow behavior assertions.
 - This design document and the later implementation plan.
 
-No HTML, CSS, application JavaScript, content, audio controller, soundtrack asset, validator policy, build script, package metadata, or public asset should change unless verification reveals a maintenance blocker. If hidden complexity appears, stop and re-scope rather than bundling unrelated changes.
+`tests/build.test.mjs` is verification-only for this maintenance pass; its artifact, validator, privacy, and soundtrack assertions must continue to pass unchanged.
+
+No HTML, CSS, application JavaScript, content data, audio controller, soundtrack asset, validator policy, build script, package metadata, or public asset should change unless verification reveals a maintenance blocker. If hidden complexity appears, stop and re-scope rather than bundling unrelated changes.
 
 ## Security and behavior invariants
 
@@ -51,7 +53,7 @@ No HTML, CSS, application JavaScript, content, audio controller, soundtrack asse
 
 ## Verification
 
-Use TDD for the pin-regression change: first update/add expectations so they fail against the old pins, then update the workflow pins to make them pass.
+Use TDD for the pin-regression change: first update the existing `tests/content.test.mjs` expectations so they fail against the old pins, then update the workflow pins to make them pass.
 
 Before opening the PR, run all Node tests, `node scripts/validate.mjs`, and `node scripts/build-site.mjs`. Verify the exact 10-file `_site` inventory, byte equality for built source copies, and byte-identical soundtrack copy with the already pinned soundtrack SHA. Review the final diff to ensure only workflow/test/spec/plan maintenance files changed.
 
