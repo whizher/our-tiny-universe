@@ -1,0 +1,63 @@
+name: Temporary maintenance verifier
+
+on:
+  pull_request:
+    branches: ["main"]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+
+      - name: Remove temporary verifier from tested tree
+        run: |
+          git rm --cached .github/workflows/maintenance-verify.yml
+          rm .github/workflows/maintenance-verify.yml
+
+      - name: Run full test suite
+        run: node --test tests/*.test.mjs
+
+      - name: Validate repository policy
+        run: node scripts/validate.mjs
+
+      - name: Build production artifact
+        run: node scripts/build-site.mjs
+
+      - name: Verify exact artifact boundary and soundtrack
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected=$'.nojekyll\nassets/favicon.svg\nassets/has-to-be.opus\nassets/social-preview.png\nindex.html\nscript.js\nsrc/audio.mjs\nsrc/content.mjs\nsrc/time.mjs\nstyles.css'
+          actual="$(find _site -type f -printf '%P\n' | sort)"
+          test "$actual" = "$expected"
+
+          cmp index.html _site/index.html
+          cmp styles.css _site/styles.css
+          cmp script.js _site/script.js
+          cmp src/audio.mjs _site/src/audio.mjs
+          cmp src/content.mjs _site/src/content.mjs
+          cmp src/time.mjs _site/src/time.mjs
+          cmp assets/favicon.svg _site/assets/favicon.svg
+          cmp assets/social-preview.png _site/assets/social-preview.png
+          cmp assets/has-to-be.opus _site/assets/has-to-be.opus
+
+          expected_sha=d5fc2e189524fb8228651bc733555a327e9fe2f516fed6c7872f1bfe345a1d5e
+          test "$(sha256sum assets/has-to-be.opus | awk '{print $1}')" = "$expected_sha"
+          test "$(sha256sum _site/assets/has-to-be.opus | awk '{print $1}')" = "$expected_sha"
+
+          grep -F 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1' .github/workflows/pages.yml
+          grep -F 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' .github/workflows/pages.yml
+          grep -F 'actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d' .github/workflows/pages.yml
+          grep -F 'actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9' .github/workflows/pages.yml
+          grep -F 'actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128' .github/workflows/pages.yml
