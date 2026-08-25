@@ -236,3 +236,78 @@ test("Pages workflow pins every external action to an approved immutable commit"
     assert.equal(ref, approved.get(action));
   }
 });
+
+test("Pages workflow deploys only from main or manual dispatch", async () => {
+  const workflow = await readFile(".github/workflows/pages.yml", "utf8");
+
+  assert.match(
+    workflow,
+    /^on:\n  push:\n    branches: \["main"\]\n  workflow_dispatch:\s*$/m,
+  );
+  assert.doesNotMatch(workflow, /^\s*pull_request:\s*$/m);
+});
+
+function jobBlock(workflow, jobName, nextJobName = null) {
+  const start = workflow.indexOf(`  ${jobName}:\n`);
+  assert.notEqual(start, -1, `missing ${jobName} job`);
+  if (!nextJobName) {
+    return workflow.slice(start);
+  }
+  const end = workflow.indexOf(`  ${nextJobName}:\n`, start + 1);
+  assert.notEqual(end, -1, `missing ${nextJobName} job`);
+  return workflow.slice(start, end);
+}
+
+test("Pages workflow isolates read-only build from privileged deploy", async () => {
+  const workflow = await readFile(".github/workflows/pages.yml", "utf8");
+  const build = jobBlock(workflow, "build", "deploy");
+  const deploy = jobBlock(workflow, "deploy");
+
+  assert.match(workflow, /^permissions: \{\}$/m);
+
+  assert.match(build, /^  build:\n    permissions:\n      contents: read$/m);
+  assert.doesNotMatch(build, /^\s*(?:pages: write|id-token: write)$/m);
+  assert.match(build, /^\s*run: node --test tests\/\*\.test\.mjs$/m);
+  assert.match(build, /^\s*run: node scripts\/validate\.mjs$/m);
+  assert.match(build, /^\s*run: node scripts\/build-site\.mjs$/m);
+  assert.match(
+    build,
+    /actions\/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9/,
+  );
+
+  assert.match(
+    deploy,
+    /^  deploy:\n    permissions:\n      pages: write\n      id-token: write\n    needs: build$/m,
+  );
+  assert.doesNotMatch(deploy, /^\s*contents: read$/m);
+  assert.doesNotMatch(deploy, /^\s*run:\s*node\b/m);
+  assert.match(
+    deploy,
+    /actions\/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128/,
+  );
+});
+
+test("validation workflow is PR-enabled, read-only, bounded, and pinned", async () => {
+  const workflow = await readFile(".github/workflows/validate.yml", "utf8");
+  const approved = new Map([
+    ["actions/checkout", "3d3c42e5aac5ba805825da76410c181273ba90b1"],
+    ["actions/setup-node", "49933ea5288caeca8642d1e84afbd3f7d6820020"],
+  ]);
+  const uses = [
+    ...workflow.matchAll(/^\s*uses:\s+([^@\s]+)@([^\s#]+)(?:\s+#.*)?$/gm),
+  ];
+
+  assert.match(workflow, /^on:\n  push:\n    branches: \["main"\]\n  pull_request:\s*$/m);
+  assert.match(workflow, /^permissions:\n  contents: read$/m);
+  assert.doesNotMatch(workflow, /^\s*(?:pages: write|id-token: write)$/m);
+  assert.match(workflow, /^\s*timeout-minutes:\s*10$/m);
+  assert.match(workflow, /^\s*run: node --test tests\/\*\.test\.mjs$/m);
+  assert.match(workflow, /^\s*run: node scripts\/validate\.mjs$/m);
+  assert.match(workflow, /^\s*run: node scripts\/build-site\.mjs$/m);
+  assert.doesNotMatch(workflow, /actions\/(?:configure-pages|upload-pages-artifact|deploy-pages)@/);
+  assert.equal(uses.length, approved.size);
+  for (const [, action, ref] of uses) {
+    assert.match(ref, /^[0-9a-f]{40}$/);
+    assert.equal(ref, approved.get(action));
+  }
+});
