@@ -106,6 +106,7 @@ async function validateFixture({
 test("repository policy permits every exact approved tracked path", () => {
   const approvedPaths = [
     ".github/workflows/pages.yml",
+    ".github/workflows/validate.yml",
     ".gitignore",
     "README.md",
     "package.json",
@@ -126,7 +127,7 @@ test("repository policy permits every exact approved tracked path", () => {
     "assets/social-preview.png",
     "assets/favicon.svg",
   ];
-  assert.equal(new Set(approvedPaths).size, 20);
+  assert.equal(new Set(approvedPaths).size, 21);
   assert.deepEqual(
     validateTrackedEntries(approvedPaths.map((path) => ({ path, size: 1 }))),
     [],

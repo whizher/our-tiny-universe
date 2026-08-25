@@ -15,6 +15,7 @@ const SOUNDTRACK_SHA256 =
   "d5fc2e189524fb8228651bc733555a327e9fe2f516fed6c7872f1bfe345a1d5e";
 const APPROVED_EXACT_PATHS = new Set([
   ".github/workflows/pages.yml",
+  ".github/workflows/validate.yml",
   ".gitignore",
   "README.md",
   "package.json",
