@@ -179,7 +179,6 @@ export function initSite({
   function toggleMotion() {
     motionPaused = !motionPaused;
     documentRef.documentElement.dataset.motionPaused = String(motionPaused);
-    motionButton.setAttribute("aria-pressed", String(motionPaused));
     motionButton.textContent = motionPaused ? "Resume motion" : "Pause motion";
     if (motionPaused) {
       cancelSchedule(cleanupTimer);
@@ -313,6 +312,9 @@ export function initSite({
       shareStatus.hidden = false;
     } else if (outcome === "manual") {
       shareFallback.hidden = false;
+      shareStatus.textContent =
+        "Couldn't share or copy automatically. Use the manual sharing link below.";
+      shareStatus.hidden = false;
     }
   }
 

@@ -235,7 +235,7 @@ test("pausing motion clears particles and suppresses effects without blocking me
   await elements.stars[0].click();
   assert.equal(elements.layer.children.length, 5);
   await elements.motionButton.click();
-  assert.equal(elements.motionButton.getAttribute("aria-pressed"), "true");
+  assert.equal(elements.motionButton.getAttribute("aria-pressed"), null);
   assert.equal(elements.motionButton.textContent, "Resume motion");
   assert.equal(documentRef.documentElement.dataset.motionPaused, "true");
   assert.equal(elements.layer.children.length, 0);
@@ -248,7 +248,8 @@ test("pausing motion clears particles and suppresses effects without blocking me
   assert.equal(scheduled.length, count);
   assert.ok(cancelled.length > 0);
   await elements.motionButton.click();
-  assert.equal(elements.motionButton.getAttribute("aria-pressed"), "false");
+  assert.equal(elements.motionButton.getAttribute("aria-pressed"), null);
+  assert.equal(elements.motionButton.textContent, "Pause motion");
   assert.equal(documentRef.documentElement.dataset.motionPaused, "false");
   assert.equal(scheduled.at(-1).delay, 18_000);
   await elements.stars[0].click();
@@ -262,9 +263,9 @@ test("motion resume cannot override the visitor's reduced-motion preference", as
     schedule: (callback, delay) => { scheduled.push({ callback, delay }); return scheduled.length; },
     cancelSchedule: () => {} });
   await elements.motionButton.click();
-  assert.equal(elements.motionButton.getAttribute("aria-pressed"), "true");
+  assert.equal(elements.motionButton.getAttribute("aria-pressed"), null);
   await elements.motionButton.click();
-  assert.equal(elements.motionButton.getAttribute("aria-pressed"), "false");
+  assert.equal(elements.motionButton.getAttribute("aria-pressed"), null);
   await elements.stars[0].click();
   assert.equal(elements.layer.children.length, 0);
   assert.equal(scheduled.length, 1);
@@ -955,6 +956,58 @@ test("keeps cancellation silent and reveals a manual fallback on failure", async
     MESSAGE_POOLS.rity[0],
   );
   assert.equal(failed.elements.shareFallback.hidden, false);
+  assert.equal(failed.elements.shareStatus.hidden, false);
+  assert.equal(
+    failed.elements.shareStatus.textContent,
+    "Couldn't share or copy automatically. Use the manual sharing link below.",
+  );
+});
+
+test("announces the manual sharing link when both sharing APIs are unavailable", async () => {
+  const { documentRef, elements } = createFixture();
+  initSite({
+    documentRef,
+    nativeShare: null,
+    writeClipboard: null,
+    schedule: () => 1,
+    cancelSchedule: () => {},
+  });
+  await elements.shareButton.click();
+  assert.equal(elements.shareFallback.hidden, false);
+  assert.equal(elements.shareStatus.hidden, false);
+  assert.equal(
+    elements.shareStatus.textContent,
+    "Couldn't share or copy automatically. Use the manual sharing link below.",
+  );
+});
+
+test("cancellation clears an earlier manual fallback without copying or announcing", async () => {
+  const { documentRef, elements } = createFixture();
+  let cancel = false;
+  let copies = 0;
+  initSite({
+    documentRef,
+    nativeShare: async () => {
+      const error = new Error(cancel ? "cancelled" : "unavailable");
+      if (cancel) error.name = "AbortError";
+      throw error;
+    },
+    writeClipboard: async () => {
+      copies += 1;
+      throw new Error("clipboard unavailable");
+    },
+    schedule: () => 1,
+    cancelSchedule: () => {},
+  });
+  await elements.shareButton.click();
+  assert.equal(elements.shareFallback.hidden, false);
+  assert.equal(elements.shareStatus.hidden, false);
+  cancel = true;
+  await elements.shareButton.click();
+  assert.equal(copies, 1);
+  assert.equal(elements.shareFallback.hidden, true);
+  assert.equal(elements.shareStatus.hidden, true);
+  assert.equal(elements.shareStatus.textContent, "");
 });
 
 test("destroy removes the share listener", async () => {

@@ -319,6 +319,15 @@ test("star controls explain their result and share repeated-selection guidance",
   assert.match(html, /id="star-guidance"[^>]*>\s*Select either star for a transmission\. Select again for another\./);
 });
 
+test("motion uses an action button with a changing label, without toggle state", async () => {
+  const html = await readFile("index.html", "utf8");
+  const button = html.match(/<button\b[^>]*data-motion-toggle[^>]*>[\s\S]*?<\/button>/)?.[0] || "";
+  assert.match(button, /type="button"/);
+  assert.match(button, />\s*Pause motion\s*<\/button>/);
+  assert.doesNotMatch(button, /aria-pressed/);
+  assert.doesNotMatch(button, /aria-label/);
+});
+
 test("active documentation credits only the replacement soundtrack", async () => {
   const readme = await readFile("README.md", "utf8");
   assert.match(readme, /“Has to Be” is by Capzlock/);
