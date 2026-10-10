@@ -139,6 +139,7 @@ function createFixture() {
     layer: new FakeElement(),
     musicButton: new FakeElement(),
     musicStatus: new FakeElement(),
+    motionButton: new FakeElement(),
     audioChannels: [new FakeElement(), new FakeElement()],
     stars: [new FakeElement(), new FakeElement()],
   };
@@ -160,8 +161,10 @@ function createFixture() {
     ["[data-shooting-stars]", elements.layer],
     ["[data-music-toggle]", elements.musicButton],
     ["[data-music-status]", elements.musicStatus],
+    ["[data-motion-toggle]", elements.motionButton],
   ]);
   const documentRef = {
+    documentElement: new FakeElement(),
     querySelector: (selector) => selectors.get(selector) || null,
     querySelectorAll: (selector) =>
       selector === "[data-message-source]"
@@ -173,6 +176,102 @@ function createFixture() {
   };
   return { documentRef, elements };
 }
+
+test("loads both local soundtrack channels only after Play", async () => {
+  const { documentRef, elements } = createFixture();
+  initProductionSite({ documentRef, schedule: () => 1, cancelSchedule: () => {} });
+  assert.ok(elements.audioChannels.every((channel) => channel.getAttribute("src") === null));
+  assert.ok(elements.audioChannels.every((channel) => channel.paused));
+  await elements.stars[0].click();
+  assert.ok(elements.audioChannels.every((channel) => channel.getAttribute("src") === null));
+  await elements.musicButton.click();
+  assert.deepEqual(elements.audioChannels.map((channel) => channel.getAttribute("src")),
+    ["assets/has-to-be.opus", "assets/has-to-be.opus"]);
+  assert.equal(elements.audioChannels[0].paused, false);
+});
+
+test("switches transmission language to English", async () => {
+  const { documentRef, elements } = createFixture();
+  elements.message.setAttribute("lang", "id");
+  initSite({ documentRef, schedule: () => 1, cancelSchedule: () => {} });
+  for (const star of elements.stars) {
+    await star.click();
+    assert.equal(elements.message.getAttribute("lang"), "en");
+  }
+});
+
+test("matches Anti-Cringe language to the unchanged selected message", async () => {
+  const { documentRef, elements } = createFixture();
+  initSite({ documentRef, random: () => 0, schedule: () => 1, cancelSchedule: () => {} });
+  await elements.antiButton.click();
+  assert.equal(elements.antiResult.getAttribute("lang"), "id");
+  await elements.antiButton.click();
+  assert.equal(elements.antiResult.getAttribute("lang"), "en");
+});
+
+test("updates anniversary language across Pontianak midnight", () => {
+  const { documentRef, elements } = createFixture();
+  let current = new Date("2026-07-06T16:59:00Z");
+  const timers = [];
+  initSite({ documentRef, now: () => current, reducedMotion: () => true,
+    schedule: (callback, delay) => { timers.push({ callback, delay }); return timers.length; },
+    cancelSchedule: () => {} });
+  assert.equal(elements.anniversaryStatus.getAttribute("lang"), "id");
+  current = new Date("2026-07-06T17:00:00Z");
+  timers[0].callback();
+  assert.equal(elements.anniversaryStatus.getAttribute("lang"), "en");
+  current = new Date("2026-07-07T17:00:00Z");
+  timers.at(-1).callback();
+  assert.equal(elements.anniversaryStatus.getAttribute("lang"), "id");
+});
+
+test("pausing motion clears particles and suppresses effects without blocking messages", async () => {
+  const { documentRef, elements } = createFixture();
+  const scheduled = [];
+  const cancelled = [];
+  initSite({ documentRef, reducedMotion: () => false, random: () => 0,
+    schedule: (callback, delay) => { scheduled.push({ callback, delay }); return scheduled.length; },
+    cancelSchedule: (id) => cancelled.push(id) });
+  await elements.stars[0].click();
+  assert.equal(elements.layer.children.length, 5);
+  await elements.motionButton.click();
+  assert.equal(elements.motionButton.getAttribute("aria-pressed"), "true");
+  assert.equal(elements.motionButton.textContent, "Resume motion");
+  assert.equal(documentRef.documentElement.dataset.motionPaused, "true");
+  assert.equal(elements.layer.children.length, 0);
+  const count = scheduled.length;
+  await elements.stars[1].click();
+  await elements.antiButton.click();
+  assert.ok(MESSAGE_POOLS.rity.includes(elements.message.textContent));
+  assert.equal(elements.antiResult.hidden, false);
+  assert.equal(elements.layer.children.length, 0);
+  assert.equal(scheduled.length, count);
+  assert.ok(cancelled.length > 0);
+  await elements.motionButton.click();
+  assert.equal(elements.motionButton.getAttribute("aria-pressed"), "false");
+  assert.equal(documentRef.documentElement.dataset.motionPaused, "false");
+  assert.equal(scheduled.at(-1).delay, 18_000);
+  await elements.stars[0].click();
+  assert.equal(elements.layer.children.length, 5);
+});
+
+test("motion resume cannot override the visitor's reduced-motion preference", async () => {
+  const { documentRef, elements } = createFixture();
+  const scheduled = [];
+  const site = initSite({ documentRef, reducedMotion: () => true,
+    schedule: (callback, delay) => { scheduled.push({ callback, delay }); return scheduled.length; },
+    cancelSchedule: () => {} });
+  await elements.motionButton.click();
+  assert.equal(elements.motionButton.getAttribute("aria-pressed"), "true");
+  await elements.motionButton.click();
+  assert.equal(elements.motionButton.getAttribute("aria-pressed"), "false");
+  await elements.stars[0].click();
+  assert.equal(elements.layer.children.length, 0);
+  assert.equal(scheduled.length, 1);
+  site.destroy();
+  await elements.motionButton.click();
+  assert.equal(documentRef.documentElement.dataset.motionPaused, undefined);
+});
 
 function assertMusicView(elements, {
   accessibleLabel,

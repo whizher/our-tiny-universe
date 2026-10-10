@@ -274,8 +274,8 @@ test("soundtrack markup is local, manual, visible, and duplicated for crossfade"
 
   assert.equal(channels.length, 2);
   for (const channel of channels) {
-    assert.match(channel, /src="assets\/has-to-be\.opus"/);
-    assert.match(channel, /preload="metadata"/);
+    assert.doesNotMatch(channel, /\bsrc\s*=/);
+    assert.match(channel, /preload="none"/);
     assert.doesNotMatch(channel, /\b(?:autoplay|loop)\b/i);
   }
   assert.match(html, /data-music-toggle/);
@@ -289,6 +289,34 @@ test("soundtrack markup is local, manual, visible, and duplicated for crossfade"
   assert.match(toggle, />\s*🎵\s*<\/button>/);
   assert.doesNotMatch(toggle, />[^<]*Play soundtrack/);
   assert.doesNotMatch(html, /(?:youtube|spotify|soundcloud)\.com/i);
+});
+
+test("declares English as the default with Indonesian passages identified", async () => {
+  const html = await readFile("index.html", "utf8");
+  assert.match(html, /<html lang="en">/);
+  assert.match(html, /class="subtitle" lang="id"/);
+  assert.match(html, /data-days lang="id"/);
+  assert.match(html, /data-anniversary-status lang="id"/);
+  assert.match(html, /data-message lang="id"/);
+  assert.match(html, /<span lang="id">7 Juli 2024<\/span>/);
+});
+
+test("announces speaker and transmission together in one persistent region", async () => {
+  const html = await readFile("index.html", "utf8");
+  assert.match(html, /<div aria-live="polite" aria-atomic="true">\s*<h2[^>]*data-message-title[\s\S]*?<p[^>]*data-message[\s\S]*?<\/div>/);
+  const message = html.match(/<p\b[^>]*data-message\b[^>]*>/)?.[0] || "";
+  assert.doesNotMatch(message, /aria-live/);
+  assert.match(html, /<div aria-live="polite" aria-atomic="true">\s*<p[^>]*data-anti-result/);
+  assert.match(html, /<div aria-live="polite" aria-atomic="true">\s*<p[^>]*data-share-status/);
+});
+
+test("star controls explain their result and share repeated-selection guidance", async () => {
+  const html = await readFile("index.html", "utf8");
+  for (const name of ["Naufal", "Rity"]) {
+    const star = html.match(new RegExp(`<button[^>]*aria-label="Read a transmission from ${name}"[^>]*>`))?.[0] || "";
+    assert.match(star, /aria-describedby="star-guidance"/);
+  }
+  assert.match(html, /id="star-guidance"[^>]*>\s*Select either star for a transmission\. Select again for another\./);
 });
 
 test("active documentation credits only the replacement soundtrack", async () => {
@@ -1111,4 +1139,18 @@ test("keeps new effects inside reduced-motion handling", async () => {
   assert.match(css, /\.message--reveal/);
   assert.match(css, /\[data-anniversary="true"\]/);
   assert.match(css, /@media \(prefers-reduced-motion: reduce\)/);
+  const reducedMotionRules = css.slice(css.indexOf("@media (prefers-reduced-motion: reduce)"));
+  assert.match(reducedMotionRules, /\.character-star\s*\{\s*animation:\s*none\s*!important;/);
+});
+
+test("focused stars stay still and manual pause also stops background motion", async () => {
+  const css = await readFile("styles.css", "utf8");
+  const pausedRules = [...css.matchAll(/([^{}]+)\{([^{}]*animation-play-state:\s*paused;[^{}]*)\}/g)]
+    .map((rule) => rule[1]);
+  assert.ok(pausedRules.some((selectors) => selectors.includes(".orbit-scene:focus-within .character-star")));
+  assert.ok(pausedRules.some((selectors) => selectors.includes(':root[data-motion-paused="true"] .character-star')));
+  for (const background of ["body::before", "body::after"]) {
+    assert.ok(pausedRules.some((selectors) => selectors.includes(':root[data-motion-paused="true"] ' + background)));
+  }
+  assert.match(css, /:root\[data-motion-paused="true"\] \.message--reveal\s*\{\s*animation:\s*none;/);
 });

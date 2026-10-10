@@ -121,6 +121,7 @@ export function initSite({
   const stars = [...documentRef.querySelectorAll("[data-message-source]")];
   const musicButton = documentRef.querySelector("[data-music-toggle]");
   const musicStatus = documentRef.querySelector("[data-music-status]");
+  const motionButton = documentRef.querySelector("[data-motion-toggle]");
   const audioChannels = [
     ...documentRef.querySelectorAll("[data-soundtrack-channel]"),
   ];
@@ -137,6 +138,7 @@ export function initSite({
     shareStatus,
     shareFallback,
     shootingLayer,
+    motionButton,
   ];
   const sources = stars.map((star) => star.dataset.messageSource).sort();
   const validSources =
@@ -167,9 +169,27 @@ export function initSite({
   let lastAntiCringeIndex = -1;
   let currentTransmission = null;
   let anniversaryActive = false;
+  let motionPaused = false;
+  let soundtrackLoaded = false;
+
+  function motionSuppressed() {
+    return motionPaused || reducedMotion();
+  }
+
+  function toggleMotion() {
+    motionPaused = !motionPaused;
+    documentRef.documentElement.dataset.motionPaused = String(motionPaused);
+    motionButton.setAttribute("aria-pressed", String(motionPaused));
+    motionButton.textContent = motionPaused ? "Resume motion" : "Pause motion";
+    if (motionPaused) {
+      cancelSchedule(cleanupTimer);
+      shootingLayer.replaceChildren();
+    }
+    scheduleAmbientMeteor();
+  }
 
   function renderShootingStars(preset) {
-    if (reducedMotion()) return;
+    if (motionSuppressed()) return;
 
     const specs = createShootingStarSpecs(preset, random);
     const particles = specs.map((spec) => {
@@ -209,11 +229,12 @@ export function initSite({
       "Sudah " + daysTogether(current) + " hari di orbit yang sama.";
     const state = anniversaryState(current);
     universe.dataset.anniversary = String(state.isAnniversary);
+    anniversaryStatus.setAttribute("lang", state.isAnniversary ? "en" : "id");
     anniversaryStatus.textContent = state.isAnniversary
       ? "Orbit anniversary unlocked ✨"
       : state.daysUntilNext + " hari menuju orbit anniversary berikutnya.";
 
-    if (state.isAnniversary && !anniversaryActive && !reducedMotion()) {
+    if (state.isAnniversary && !anniversaryActive && !motionSuppressed()) {
       renderShootingStars("anniversary");
     }
     anniversaryActive = state.isAnniversary;
@@ -228,7 +249,7 @@ export function initSite({
 
   function scheduleAmbientMeteor() {
     cancelSchedule(ambientTimer);
-    if (reducedMotion()) return;
+    if (motionSuppressed()) return;
 
     const elapsed = now().getTime() - lastTransmissionActivityAt;
     const range =
@@ -257,6 +278,7 @@ export function initSite({
       source.charAt(0).toUpperCase() +
       source.slice(1) +
       " ✨";
+    message.setAttribute("lang", "en");
     message.textContent = selection.message;
     message.classList.remove("message--reveal");
     void message.offsetWidth;
@@ -268,6 +290,7 @@ export function initSite({
   function launchAntiCringe() {
     const selection = pickNextAntiCringe(lastAntiCringeIndex, random);
     lastAntiCringeIndex = selection.index;
+    antiResult.setAttribute("lang", selection.index === 0 ? "id" : "en");
     antiResult.hidden = false;
     antiResult.textContent = selection.message;
     renderShootingStars("antiCringe");
@@ -350,6 +373,14 @@ export function initSite({
     if (["playing", "resuming", "starting"].includes(soundtrack.getState())) {
       soundtrack.pause();
     } else {
+      if (!soundtrackLoaded) {
+        // Attach both local sources within the visitor's Play gesture so the
+        // existing crossfade controller can authorize both channels together.
+        for (const channel of audioChannels) {
+          channel.setAttribute("src", "assets/has-to-be.opus");
+        }
+        soundtrackLoaded = true;
+      }
       await soundtrack.play();
     }
   }
@@ -357,6 +388,8 @@ export function initSite({
   renderTemporalState();
   scheduleCounterUpdate();
   scheduleAmbientMeteor();
+  motionButton.hidden = false;
+  motionButton.addEventListener("click", toggleMotion);
   stars.forEach((star) => star.addEventListener("click", revealMessage));
   antiButton.addEventListener("click", launchAntiCringe);
   shareButton.addEventListener("click", launchShare);
@@ -370,6 +403,8 @@ export function initSite({
       antiButton.removeEventListener("click", launchAntiCringe);
       shareButton.removeEventListener("click", launchShare);
       musicButton.removeEventListener("click", toggleSoundtrack);
+      motionButton.removeEventListener("click", toggleMotion);
+      delete documentRef.documentElement.dataset.motionPaused;
       soundtrack.destroy();
       cancelSchedule(midnightTimer);
       cancelSchedule(ambientTimer);
