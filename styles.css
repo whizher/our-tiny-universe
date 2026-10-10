@@ -11,7 +11,8 @@
   --pink: #ff8fb8;
   --panel: rgba(16, 24, 66, 0.78);
   --border: rgba(207, 216, 255, 0.22);
-  --radius: clamp(6.4rem, 29vw, 11rem);
+  /* Leave room for each star, its focus outline, and the page gutter. */
+  --radius: min(clamp(6.4rem, 29vw, 11rem), calc(50vw - 4.75rem));
   font-family: ui-rounded, "Segoe UI", system-ui, sans-serif;
 }
 
@@ -244,6 +245,40 @@ button:focus-visible {
 
 .character-star--rity {
   animation-delay: -6.5s;
+}
+
+.orbit-scene:hover .character-star,
+.orbit-scene:focus-within .character-star,
+:root[data-motion-paused="true"] .character-star,
+:root[data-motion-paused="true"] body::before,
+:root[data-motion-paused="true"] body::after {
+  animation-play-state: paused;
+}
+
+:root[data-motion-paused="true"] .message--reveal {
+  animation: none;
+}
+
+.orbit-controls {
+  max-width: 34rem;
+  margin: 0 auto 2rem;
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.star-guidance {
+  margin: 0 0 0.25rem;
+  line-height: 1.5;
+}
+
+.motion-toggle {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0.5rem 0.8rem;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  cursor: pointer;
 }
 
 .character-star svg {
@@ -577,6 +612,10 @@ button:focus-visible {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .motion-toggle {
+    display: none;
+  }
+
   *,
   *::before,
   *::after {
@@ -584,6 +623,10 @@ button:focus-visible {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+  }
+
+  .character-star {
+    animation: none !important;
   }
 
   .character-star--naufal {
