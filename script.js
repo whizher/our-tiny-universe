@@ -323,37 +323,31 @@ export function initSite({
       idle: {
         accessibleLabel: "Play soundtrack",
         icon: "🎵",
-        pressed: "false",
         status: "Tap 🎵 to start Has to Be.",
       },
       starting: {
         accessibleLabel: "Pause soundtrack",
         icon: "⏸",
-        pressed: "true",
         status: "Tap 🎵 to start Has to Be.",
       },
       playing: {
         accessibleLabel: "Pause soundtrack",
         icon: "⏸",
-        pressed: "true",
         status: "Has to Be — Capzlock",
       },
       resuming: {
         accessibleLabel: "Pause soundtrack",
         icon: "⏸",
-        pressed: "true",
         status: "Has to Be — Capzlock",
       },
       paused: {
         accessibleLabel: "Resume soundtrack",
         icon: "▶",
-        pressed: "false",
         status: "Has to Be — Capzlock · Paused",
       },
       error: {
         accessibleLabel: "Retry soundtrack",
         icon: "↻",
-        pressed: "false",
         status: "Has to Be couldn’t start. Tap to try again.",
       },
     };
@@ -361,7 +355,6 @@ export function initSite({
     if (!view) return;
     musicButton.textContent = view.icon;
     musicButton.setAttribute("aria-label", view.accessibleLabel);
-    musicButton.setAttribute("aria-pressed", view.pressed);
     musicStatus.textContent = view.status;
   }
 

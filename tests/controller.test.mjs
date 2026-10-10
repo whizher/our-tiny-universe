@@ -277,7 +277,6 @@ test("motion resume cannot override the visitor's reduced-motion preference", as
 function assertMusicView(elements, {
   accessibleLabel,
   icon,
-  pressed,
   status,
 }) {
   assert.equal(elements.musicButton.textContent, icon);
@@ -287,8 +286,9 @@ function assertMusicView(elements, {
   );
   assert.equal(
     elements.musicButton.getAttribute("aria-pressed"),
-    pressed,
+    null,
   );
+  assert.equal(elements.musicButton.getAttribute("aria-checked"), null);
   assert.equal(elements.musicStatus.textContent, status);
 }
 
@@ -303,7 +303,6 @@ test("renders the initial soundtrack control state", () => {
   assertMusicView(elements, {
     accessibleLabel: "Play soundtrack",
     icon: "🎵",
-    pressed: "false",
     status: "Tap 🎵 to start Has to Be.",
   });
 });
@@ -324,7 +323,6 @@ test("shows Pause while initial soundtrack playback is pending", async () => {
   assertMusicView(elements, {
     accessibleLabel: "Pause soundtrack",
     icon: "⏸",
-    pressed: "true",
     status: "Tap 🎵 to start Has to Be.",
   });
 
@@ -333,7 +331,6 @@ test("shows Pause while initial soundtrack playback is pending", async () => {
   assertMusicView(elements, {
     accessibleLabel: "Pause soundtrack",
     icon: "⏸",
-    pressed: "true",
     status: "Has to Be — Capzlock",
   });
 });
@@ -352,7 +349,6 @@ test("plays, pauses, and resumes the soundtrack through the visible control", as
   assertMusicView(elements, {
     accessibleLabel: "Pause soundtrack",
     icon: "⏸",
-    pressed: "true",
     status: "Has to Be — Capzlock",
   });
 
@@ -360,7 +356,6 @@ test("plays, pauses, and resumes the soundtrack through the visible control", as
   assertMusicView(elements, {
     accessibleLabel: "Resume soundtrack",
     icon: "▶",
-    pressed: "false",
     status: "Has to Be — Capzlock · Paused",
   });
 
@@ -368,7 +363,6 @@ test("plays, pauses, and resumes the soundtrack through the visible control", as
   assertMusicView(elements, {
     accessibleLabel: "Pause soundtrack",
     icon: "⏸",
-    pressed: "true",
     status: "Has to Be — Capzlock",
   });
 });
@@ -392,7 +386,6 @@ test("keeps Pause available while soundtrack resume is pending", async () => {
   assertMusicView(elements, {
     accessibleLabel: "Pause soundtrack",
     icon: "⏸",
-    pressed: "true",
     status: "Has to Be — Capzlock",
   });
 
@@ -405,7 +398,6 @@ test("keeps Pause available while soundtrack resume is pending", async () => {
   assertMusicView(elements, {
     accessibleLabel: "Resume soundtrack",
     icon: "▶",
-    pressed: "false",
     status: "Has to Be — Capzlock · Paused",
   });
   assert.ok(elements.audioChannels.every((channel) => channel.paused));
@@ -426,7 +418,6 @@ test("reflects an external active-channel pause through the visible control", as
   assertMusicView(elements, {
     accessibleLabel: "Resume soundtrack",
     icon: "▶",
-    pressed: "false",
     status: "Has to Be — Capzlock · Paused",
   });
   assert.ok(elements.audioChannels.every((channel) => channel.paused));
@@ -446,7 +437,6 @@ test("reflects a fatal media error through the visible control", async () => {
   assertMusicView(elements, {
     accessibleLabel: "Retry soundtrack",
     icon: "↻",
-    pressed: "false",
     status: "Has to Be couldn’t start. Tap to try again.",
   });
   assert.ok(elements.audioChannels.every((channel) => channel.paused));
@@ -469,7 +459,6 @@ test("offers retry copy after an error and retries playback", async () => {
   assertMusicView(elements, {
     accessibleLabel: "Retry soundtrack",
     icon: "↻",
-    pressed: "false",
     status: "Has to Be couldn’t start. Tap to try again.",
   });
 
@@ -477,9 +466,87 @@ test("offers retry copy after an error and retries playback", async () => {
   assertMusicView(elements, {
     accessibleLabel: "Pause soundtrack",
     icon: "⏸",
-    pressed: "true",
     status: "Has to Be — Capzlock",
   });
+});
+
+test("soundtrack action names stay consistent through real controller transitions", async () => {
+  const { documentRef, elements } = createFixture();
+  initProductionSite({
+    documentRef,
+    schedule: () => 1,
+    cancelSchedule: () => {},
+  });
+
+  assertMusicView(elements, {
+    accessibleLabel: "Play soundtrack",
+    icon: "🎵",
+    status: "Tap 🎵 to start Has to Be.",
+  });
+  assert.ok(elements.audioChannels.every((channel) => channel.paused));
+
+  let releaseStart;
+  elements.audioChannels[0].playWaits.push(
+    new Promise((resolve) => { releaseStart = resolve; }),
+  );
+  const startClick = elements.musicButton.click();
+  assertMusicView(elements, {
+    accessibleLabel: "Pause soundtrack",
+    icon: "⏸",
+    status: "Tap 🎵 to start Has to Be.",
+  });
+  releaseStart();
+  await startClick;
+  assertMusicView(elements, {
+    accessibleLabel: "Pause soundtrack",
+    icon: "⏸",
+    status: "Has to Be — Capzlock",
+  });
+  assert.equal(elements.audioChannels[0].paused, false);
+
+  await elements.musicButton.click();
+  assertMusicView(elements, {
+    accessibleLabel: "Resume soundtrack",
+    icon: "▶",
+    status: "Has to Be — Capzlock · Paused",
+  });
+  assert.ok(elements.audioChannels.every((channel) => channel.paused));
+
+  let releaseResume;
+  elements.audioChannels[0].playWaits.push(
+    new Promise((resolve) => { releaseResume = resolve; }),
+  );
+  const resumeClick = elements.musicButton.click();
+  assertMusicView(elements, {
+    accessibleLabel: "Pause soundtrack",
+    icon: "⏸",
+    status: "Has to Be — Capzlock",
+  });
+  releaseResume();
+  await resumeClick;
+  assertMusicView(elements, {
+    accessibleLabel: "Pause soundtrack",
+    icon: "⏸",
+    status: "Has to Be — Capzlock",
+  });
+  assert.equal(elements.audioChannels[0].paused, false);
+
+  elements.audioChannels[0].emit("error");
+  assertMusicView(elements, {
+    accessibleLabel: "Retry soundtrack",
+    icon: "↻",
+    status: "Has to Be couldn’t start. Tap to try again.",
+  });
+  assert.ok(elements.audioChannels.every((channel) => channel.paused));
+  assert.ok(elements.audioChannels.every((channel) => channel.currentTime === 0));
+
+  await elements.musicButton.click();
+  assertMusicView(elements, {
+    accessibleLabel: "Pause soundtrack",
+    icon: "⏸",
+    status: "Has to Be — Capzlock",
+  });
+  assert.equal(elements.audioChannels[0].paused, false);
 });
 
 test("destroy tears down the soundtrack and removes its control listener", async () => {

@@ -285,7 +285,8 @@ test("soundtrack markup is local, manual, visible, and duplicated for crossfade"
     /<button\b[^>]*data-music-toggle[^>]*>[\s\S]*?<\/button>/,
   )?.[0] || "";
   assert.match(toggle, /aria-label="Play soundtrack"/);
-  assert.match(toggle, /aria-pressed="false"/);
+  assert.match(toggle, /type="button"/);
+  assert.doesNotMatch(toggle, /aria-(?:pressed|checked)/);
   assert.match(toggle, />\s*🎵\s*<\/button>/);
   assert.doesNotMatch(toggle, />[^<]*Play soundtrack/);
   assert.doesNotMatch(html, /(?:youtube|spotify|soundcloud)\.com/i);
