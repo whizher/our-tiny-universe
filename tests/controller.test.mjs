@@ -139,6 +139,7 @@ function createFixture() {
     layer: new FakeElement(),
     musicButton: new FakeElement(),
     musicStatus: new FakeElement(),
+    motionButton: new FakeElement(),
     audioChannels: [new FakeElement(), new FakeElement()],
     stars: [new FakeElement(), new FakeElement()],
   };
@@ -160,8 +161,10 @@ function createFixture() {
     ["[data-shooting-stars]", elements.layer],
     ["[data-music-toggle]", elements.musicButton],
     ["[data-music-status]", elements.musicStatus],
+    ["[data-motion-toggle]", elements.motionButton],
   ]);
   const documentRef = {
+    documentElement: new FakeElement(),
     querySelector: (selector) => selectors.get(selector) || null,
     querySelectorAll: (selector) =>
       selector === "[data-message-source]"
@@ -174,10 +177,106 @@ function createFixture() {
   return { documentRef, elements };
 }
 
+test("loads both local soundtrack channels only after Play", async () => {
+  const { documentRef, elements } = createFixture();
+  initProductionSite({ documentRef, schedule: () => 1, cancelSchedule: () => {} });
+  assert.ok(elements.audioChannels.every((channel) => channel.getAttribute("src") === null));
+  assert.ok(elements.audioChannels.every((channel) => channel.paused));
+  await elements.stars[0].click();
+  assert.ok(elements.audioChannels.every((channel) => channel.getAttribute("src") === null));
+  await elements.musicButton.click();
+  assert.deepEqual(elements.audioChannels.map((channel) => channel.getAttribute("src")),
+    ["assets/has-to-be.opus", "assets/has-to-be.opus"]);
+  assert.equal(elements.audioChannels[0].paused, false);
+});
+
+test("switches transmission language to English", async () => {
+  const { documentRef, elements } = createFixture();
+  elements.message.setAttribute("lang", "id");
+  initSite({ documentRef, schedule: () => 1, cancelSchedule: () => {} });
+  for (const star of elements.stars) {
+    await star.click();
+    assert.equal(elements.message.getAttribute("lang"), "en");
+  }
+});
+
+test("matches Anti-Cringe language to the unchanged selected message", async () => {
+  const { documentRef, elements } = createFixture();
+  initSite({ documentRef, random: () => 0, schedule: () => 1, cancelSchedule: () => {} });
+  await elements.antiButton.click();
+  assert.equal(elements.antiResult.getAttribute("lang"), "id");
+  await elements.antiButton.click();
+  assert.equal(elements.antiResult.getAttribute("lang"), "en");
+});
+
+test("updates anniversary language across Pontianak midnight", () => {
+  const { documentRef, elements } = createFixture();
+  let current = new Date("2026-07-06T16:59:00Z");
+  const timers = [];
+  initSite({ documentRef, now: () => current, reducedMotion: () => true,
+    schedule: (callback, delay) => { timers.push({ callback, delay }); return timers.length; },
+    cancelSchedule: () => {} });
+  assert.equal(elements.anniversaryStatus.getAttribute("lang"), "id");
+  current = new Date("2026-07-06T17:00:00Z");
+  timers[0].callback();
+  assert.equal(elements.anniversaryStatus.getAttribute("lang"), "en");
+  current = new Date("2026-07-07T17:00:00Z");
+  timers.at(-1).callback();
+  assert.equal(elements.anniversaryStatus.getAttribute("lang"), "id");
+});
+
+test("pausing motion clears particles and suppresses effects without blocking messages", async () => {
+  const { documentRef, elements } = createFixture();
+  const scheduled = [];
+  const cancelled = [];
+  initSite({ documentRef, reducedMotion: () => false, random: () => 0,
+    schedule: (callback, delay) => { scheduled.push({ callback, delay }); return scheduled.length; },
+    cancelSchedule: (id) => cancelled.push(id) });
+  await elements.stars[0].click();
+  assert.equal(elements.layer.children.length, 5);
+  await elements.motionButton.click();
+  assert.equal(elements.motionButton.getAttribute("aria-pressed"), null);
+  assert.equal(elements.motionButton.textContent, "Resume motion");
+  assert.equal(documentRef.documentElement.dataset.motionPaused, "true");
+  assert.equal(elements.layer.children.length, 0);
+  const count = scheduled.length;
+  await elements.stars[1].click();
+  await elements.antiButton.click();
+  assert.ok(MESSAGE_POOLS.rity.includes(elements.message.textContent));
+  assert.equal(elements.antiResult.hidden, false);
+  assert.equal(elements.layer.children.length, 0);
+  assert.equal(scheduled.length, count);
+  assert.ok(cancelled.length > 0);
+  await elements.motionButton.click();
+  assert.equal(elements.motionButton.getAttribute("aria-pressed"), null);
+  assert.equal(elements.motionButton.textContent, "Pause motion");
+  assert.equal(documentRef.documentElement.dataset.motionPaused, "false");
+  assert.equal(scheduled.at(-1).delay, 18_000);
+  await elements.stars[0].click();
+  assert.equal(elements.layer.children.length, 5);
+});
+
+test("motion resume cannot override the visitor's reduced-motion preference", async () => {
+  const { documentRef, elements } = createFixture();
+  const scheduled = [];
+  const site = initSite({ documentRef, reducedMotion: () => true,
+    schedule: (callback, delay) => { scheduled.push({ callback, delay }); return scheduled.length; },
+    cancelSchedule: () => {} });
+  await elements.motionButton.click();
+  assert.equal(elements.motionButton.getAttribute("aria-pressed"), null);
+  await elements.motionButton.click();
+  assert.equal(elements.motionButton.getAttribute("aria-pressed"), null);
+  await elements.stars[0].click();
+  assert.equal(elements.layer.children.length, 0);
+  assert.equal(scheduled.length, 1);
+  site.destroy();
+  await elements.motionButton.click();
+  assert.equal(documentRef.documentElement.dataset.motionPaused, undefined);
+});
+
 function assertMusicView(elements, {
   accessibleLabel,
   icon,
-  pressed,
   status,
 }) {
   assert.equal(elements.musicButton.textContent, icon);
@@ -187,8 +286,9 @@ function assertMusicView(elements, {
   );
   assert.equal(
     elements.musicButton.getAttribute("aria-pressed"),
-    pressed,
+    null,
   );
+  assert.equal(elements.musicButton.getAttribute("aria-checked"), null);
   assert.equal(elements.musicStatus.textContent, status);
 }
 
@@ -203,7 +303,6 @@ test("renders the initial soundtrack control state", () => {
   assertMusicView(elements, {
     accessibleLabel: "Play soundtrack",
     icon: "🎵",
-    pressed: "false",
     status: "Tap 🎵 to start Has to Be.",
   });
 });
@@ -224,7 +323,6 @@ test("shows Pause while initial soundtrack playback is pending", async () => {
   assertMusicView(elements, {
     accessibleLabel: "Pause soundtrack",
     icon: "⏸",
-    pressed: "true",
     status: "Tap 🎵 to start Has to Be.",
   });
 
@@ -233,7 +331,6 @@ test("shows Pause while initial soundtrack playback is pending", async () => {
   assertMusicView(elements, {
     accessibleLabel: "Pause soundtrack",
     icon: "⏸",
-    pressed: "true",
     status: "Has to Be — Capzlock",
   });
 });
@@ -252,7 +349,6 @@ test("plays, pauses, and resumes the soundtrack through the visible control", as
   assertMusicView(elements, {
     accessibleLabel: "Pause soundtrack",
     icon: "⏸",
-    pressed: "true",
     status: "Has to Be — Capzlock",
   });
 
@@ -260,7 +356,6 @@ test("plays, pauses, and resumes the soundtrack through the visible control", as
   assertMusicView(elements, {
     accessibleLabel: "Resume soundtrack",
     icon: "▶",
-    pressed: "false",
     status: "Has to Be — Capzlock · Paused",
   });
 
@@ -268,7 +363,6 @@ test("plays, pauses, and resumes the soundtrack through the visible control", as
   assertMusicView(elements, {
     accessibleLabel: "Pause soundtrack",
     icon: "⏸",
-    pressed: "true",
     status: "Has to Be — Capzlock",
   });
 });
@@ -292,7 +386,6 @@ test("keeps Pause available while soundtrack resume is pending", async () => {
   assertMusicView(elements, {
     accessibleLabel: "Pause soundtrack",
     icon: "⏸",
-    pressed: "true",
     status: "Has to Be — Capzlock",
   });
 
@@ -305,7 +398,6 @@ test("keeps Pause available while soundtrack resume is pending", async () => {
   assertMusicView(elements, {
     accessibleLabel: "Resume soundtrack",
     icon: "▶",
-    pressed: "false",
     status: "Has to Be — Capzlock · Paused",
   });
   assert.ok(elements.audioChannels.every((channel) => channel.paused));
@@ -326,7 +418,6 @@ test("reflects an external active-channel pause through the visible control", as
   assertMusicView(elements, {
     accessibleLabel: "Resume soundtrack",
     icon: "▶",
-    pressed: "false",
     status: "Has to Be — Capzlock · Paused",
   });
   assert.ok(elements.audioChannels.every((channel) => channel.paused));
@@ -346,7 +437,6 @@ test("reflects a fatal media error through the visible control", async () => {
   assertMusicView(elements, {
     accessibleLabel: "Retry soundtrack",
     icon: "↻",
-    pressed: "false",
     status: "Has to Be couldn’t start. Tap to try again.",
   });
   assert.ok(elements.audioChannels.every((channel) => channel.paused));
@@ -369,7 +459,6 @@ test("offers retry copy after an error and retries playback", async () => {
   assertMusicView(elements, {
     accessibleLabel: "Retry soundtrack",
     icon: "↻",
-    pressed: "false",
     status: "Has to Be couldn’t start. Tap to try again.",
   });
 
@@ -377,9 +466,87 @@ test("offers retry copy after an error and retries playback", async () => {
   assertMusicView(elements, {
     accessibleLabel: "Pause soundtrack",
     icon: "⏸",
-    pressed: "true",
     status: "Has to Be — Capzlock",
   });
+});
+
+test("soundtrack action names stay consistent through real controller transitions", async () => {
+  const { documentRef, elements } = createFixture();
+  initProductionSite({
+    documentRef,
+    schedule: () => 1,
+    cancelSchedule: () => {},
+  });
+
+  assertMusicView(elements, {
+    accessibleLabel: "Play soundtrack",
+    icon: "🎵",
+    status: "Tap 🎵 to start Has to Be.",
+  });
+  assert.ok(elements.audioChannels.every((channel) => channel.paused));
+
+  let releaseStart;
+  elements.audioChannels[0].playWaits.push(
+    new Promise((resolve) => { releaseStart = resolve; }),
+  );
+  const startClick = elements.musicButton.click();
+  assertMusicView(elements, {
+    accessibleLabel: "Pause soundtrack",
+    icon: "⏸",
+    status: "Tap 🎵 to start Has to Be.",
+  });
+  releaseStart();
+  await startClick;
+  assertMusicView(elements, {
+    accessibleLabel: "Pause soundtrack",
+    icon: "⏸",
+    status: "Has to Be — Capzlock",
+  });
+  assert.equal(elements.audioChannels[0].paused, false);
+
+  await elements.musicButton.click();
+  assertMusicView(elements, {
+    accessibleLabel: "Resume soundtrack",
+    icon: "▶",
+    status: "Has to Be — Capzlock · Paused",
+  });
+  assert.ok(elements.audioChannels.every((channel) => channel.paused));
+
+  let releaseResume;
+  elements.audioChannels[0].playWaits.push(
+    new Promise((resolve) => { releaseResume = resolve; }),
+  );
+  const resumeClick = elements.musicButton.click();
+  assertMusicView(elements, {
+    accessibleLabel: "Pause soundtrack",
+    icon: "⏸",
+    status: "Has to Be — Capzlock",
+  });
+  releaseResume();
+  await resumeClick;
+  assertMusicView(elements, {
+    accessibleLabel: "Pause soundtrack",
+    icon: "⏸",
+    status: "Has to Be — Capzlock",
+  });
+  assert.equal(elements.audioChannels[0].paused, false);
+
+  elements.audioChannels[0].emit("error");
+  assertMusicView(elements, {
+    accessibleLabel: "Retry soundtrack",
+    icon: "↻",
+    status: "Has to Be couldn’t start. Tap to try again.",
+  });
+  assert.ok(elements.audioChannels.every((channel) => channel.paused));
+  assert.ok(elements.audioChannels.every((channel) => channel.currentTime === 0));
+
+  await elements.musicButton.click();
+  assertMusicView(elements, {
+    accessibleLabel: "Pause soundtrack",
+    icon: "⏸",
+    status: "Has to Be — Capzlock",
+  });
+  assert.equal(elements.audioChannels[0].paused, false);
 });
 
 test("destroy tears down the soundtrack and removes its control listener", async () => {
@@ -856,6 +1023,58 @@ test("keeps cancellation silent and reveals a manual fallback on failure", async
     MESSAGE_POOLS.rity[0],
   );
   assert.equal(failed.elements.shareFallback.hidden, false);
+  assert.equal(failed.elements.shareStatus.hidden, false);
+  assert.equal(
+    failed.elements.shareStatus.textContent,
+    "Couldn't share or copy automatically. Use the manual sharing link below.",
+  );
+});
+
+test("announces the manual sharing link when both sharing APIs are unavailable", async () => {
+  const { documentRef, elements } = createFixture();
+  initSite({
+    documentRef,
+    nativeShare: null,
+    writeClipboard: null,
+    schedule: () => 1,
+    cancelSchedule: () => {},
+  });
+  await elements.shareButton.click();
+  assert.equal(elements.shareFallback.hidden, false);
+  assert.equal(elements.shareStatus.hidden, false);
+  assert.equal(
+    elements.shareStatus.textContent,
+    "Couldn't share or copy automatically. Use the manual sharing link below.",
+  );
+});
+
+test("cancellation clears an earlier manual fallback without copying or announcing", async () => {
+  const { documentRef, elements } = createFixture();
+  let cancel = false;
+  let copies = 0;
+  initSite({
+    documentRef,
+    nativeShare: async () => {
+      const error = new Error(cancel ? "cancelled" : "unavailable");
+      if (cancel) error.name = "AbortError";
+      throw error;
+    },
+    writeClipboard: async () => {
+      copies += 1;
+      throw new Error("clipboard unavailable");
+    },
+    schedule: () => 1,
+    cancelSchedule: () => {},
+  });
+  await elements.shareButton.click();
+  assert.equal(elements.shareFallback.hidden, false);
+  assert.equal(elements.shareStatus.hidden, false);
+  cancel = true;
+  await elements.shareButton.click();
+  assert.equal(copies, 1);
+  assert.equal(elements.shareFallback.hidden, true);
+  assert.equal(elements.shareStatus.hidden, true);
+  assert.equal(elements.shareStatus.textContent, "");
 });
 
 test("destroy removes the share listener", async () => {

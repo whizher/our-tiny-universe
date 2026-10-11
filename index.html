@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="id">
+<html lang="en">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -42,9 +42,9 @@
       <header class="hero">
         <p class="eyebrow">Naufal + Rity</p>
         <h1>Our Tiny Universe</h1>
-        <p class="subtitle">Satu orbit sejak 7 Juli 2024.</p>
-        <p class="counter" data-days>Sejak 7 Juli 2024</p>
-        <p class="anniversary-status" data-anniversary-status>
+        <p class="subtitle" lang="id">Satu orbit sejak 7 Juli 2024.</p>
+        <p class="counter" data-days lang="id">Sejak 7 Juli 2024</p>
+        <p class="anniversary-status" data-anniversary-status lang="id">
           Anniversary berikutnya: 7 Juli.
         </p>
       </header>
@@ -58,7 +58,8 @@
           class="character-star character-star--naufal"
           type="button"
           data-message-source="naufal"
-          aria-label="Tap Naufal's star"
+          aria-label="Read a transmission from Naufal"
+          aria-describedby="star-guidance"
         >
           <svg viewBox="0 0 120 120" aria-hidden="true">
             <path d="M60 7 75 39 110 43 84 67 91 102 60 85 29 102 36 67 10 43 45 39Z"></path>
@@ -73,7 +74,8 @@
           class="character-star character-star--rity"
           type="button"
           data-message-source="rity"
-          aria-label="Tap Rity's star"
+          aria-label="Read a transmission from Rity"
+          aria-describedby="star-guidance"
         >
           <svg viewBox="0 0 120 120" aria-hidden="true">
             <path d="M60 7 75 39 110 43 84 67 91 102 60 85 29 102 36 67 10 43 45 39Z"></path>
@@ -91,11 +93,22 @@
         ></div>
       </section>
 
-      <section class="message-card" aria-labelledby="message-title">
-        <h2 id="message-title" data-message-title>Tap a star ✨</h2>
-        <p data-message aria-live="polite">
-          Status hubungan: stable, dengan sedikit chaos.
+      <div class="orbit-controls">
+        <p class="star-guidance" id="star-guidance">
+          Select either star for a transmission. Select again for another.
         </p>
+        <button class="motion-toggle" type="button" data-motion-toggle hidden>
+          Pause motion
+        </button>
+      </div>
+
+      <section class="message-card" aria-labelledby="message-title">
+        <div aria-live="polite" aria-atomic="true">
+          <h2 id="message-title" data-message-title>Tap a star ✨</h2>
+          <p data-message lang="id">
+            Status hubungan: stable, dengan sedikit chaos.
+          </p>
+        </div>
       </section>
 
       <section class="timeline" aria-labelledby="timeline-title">
@@ -106,7 +119,7 @@
             <strong>The lore had already started.</strong>
           </li>
           <li>
-            <span>7 Juli 2024</span>
+            <span lang="id">7 Juli 2024</span>
             <strong>Officially one orbit.</strong>
           </li>
           <li>
@@ -118,14 +131,18 @@
 
       <section class="anti-cringe" aria-label="Anti-cringe control">
         <button type="button" data-anti-cringe>Emergency Anti-Cringe</button>
-        <p data-anti-result hidden aria-live="polite">
-          Okay, cukup romantisnya.
-        </p>
+        <div aria-live="polite" aria-atomic="true">
+          <p data-anti-result lang="id" hidden>
+            Okay, cukup romantisnya.
+          </p>
+        </div>
       </section>
 
       <section class="share" aria-label="Share this universe">
         <button type="button" data-share>Share Our Universe</button>
-        <p data-share-status hidden aria-live="polite"></p>
+        <div aria-live="polite" aria-atomic="true">
+          <p data-share-status hidden></p>
+        </div>
         <a
           data-share-fallback
           href="https://whizher.github.io/our-tiny-universe/"
@@ -144,20 +161,17 @@
         type="button"
         data-music-toggle
         aria-label="Play soundtrack"
-        aria-pressed="false"
       >
         🎵
       </button>
       <audio
         data-soundtrack-channel
-        src="assets/has-to-be.opus"
-        preload="metadata"
+        preload="none"
         hidden
       ></audio>
       <audio
         data-soundtrack-channel
-        src="assets/has-to-be.opus"
-        preload="metadata"
+        preload="none"
         hidden
       ></audio>
     </aside>
