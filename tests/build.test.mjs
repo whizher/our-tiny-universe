@@ -1151,14 +1151,32 @@ test("keeps new effects inside reduced-motion handling", async () => {
   assert.match(css, /@media \(prefers-reduced-motion: reduce\)/);
   const reducedMotionRules = css.slice(css.indexOf("@media (prefers-reduced-motion: reduce)"));
   assert.match(reducedMotionRules, /\.character-star\s*\{\s*animation:\s*none\s*!important;/);
+  assert.match(reducedMotionRules, /\.motion-toggle\s*\{\s*display:\s*none;/);
 });
 
-test("focused stars stay still and manual pause also stops background motion", async () => {
+test("orbit hover pause is restricted to a hover-capable fine pointer CSS context", async () => {
+  const css = await readFile("styles.css", "utf8");
+  const hoverRule = /@media\s*\(hover:\s*hover\)\s*and\s*\(pointer:\s*fine\)\s*\{\s*\.orbit-scene:hover\s+\.character-star\s*\{\s*animation-play-state:\s*paused;\s*\}\s*\}/;
+  assert.match(css, hoverRule);
+  assert.doesNotMatch(css.replace(hoverRule, ""), /\.orbit-scene:hover/);
+});
+
+test("keyboard-visible star focus pauses both stars without generic retained focus", async () => {
   const css = await readFile("styles.css", "utf8");
   const pausedRules = [...css.matchAll(/([^{}]+)\{([^{}]*animation-play-state:\s*paused;[^{}]*)\}/g)]
     .map((rule) => rule[1]);
-  assert.ok(pausedRules.some((selectors) => selectors.includes(".orbit-scene:focus-within .character-star")));
+  assert.ok(pausedRules.some((selectors) => selectors.includes(".orbit-scene:has(.character-star:focus-visible) .character-star")));
+  assert.doesNotMatch(css, /\.orbit-scene:focus-within/);
+  assert.match(css, /button:focus-visible\s*\{[^}]*outline:\s*3px solid #ffffff;/);
+});
+
+test("manual pause independently stops stars, background motion, and message reveal", async () => {
+  const css = await readFile("styles.css", "utf8");
+  const pausedRules = [...css.matchAll(/([^{}]+)\{([^{}]*animation-play-state:\s*paused;[^{}]*)\}/g)]
+    .map((rule) => rule[1]);
   assert.ok(pausedRules.some((selectors) => selectors.includes(':root[data-motion-paused="true"] .character-star')));
+  const manualPause = pausedRules.find((selectors) => selectors.includes(':root[data-motion-paused="true"] .character-star'));
+  assert.doesNotMatch(manualPause, /:has\(|:hover|:focus/);
   for (const background of ["body::before", "body::after"]) {
     assert.ok(pausedRules.some((selectors) => selectors.includes(':root[data-motion-paused="true"] ' + background)));
   }

@@ -247,8 +247,16 @@ button:focus-visible {
   animation-delay: -6.5s;
 }
 
-.orbit-scene:hover .character-star,
-.orbit-scene:focus-within .character-star,
+@media (hover: hover) and (pointer: fine) {
+  .orbit-scene:hover .character-star {
+    animation-play-state: paused;
+  }
+}
+
+.orbit-scene:has(.character-star:focus-visible) .character-star {
+  animation-play-state: paused;
+}
+
 :root[data-motion-paused="true"] .character-star,
 :root[data-motion-paused="true"] body::before,
 :root[data-motion-paused="true"] body::after {
