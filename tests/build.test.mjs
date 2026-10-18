@@ -1268,11 +1268,12 @@ test("keeps new effects inside reduced-motion handling", async () => {
   assert.match(reducedMotionRules, /\.motion-toggle\s*\{\s*display:\s*none;/);
 });
 
-test("orbit hover pause is restricted to a hover-capable fine pointer CSS context", async () => {
+test("orbit hover pause requires a hovered star on a hover-capable fine pointer", async () => {
   const css = await readFile("styles.css", "utf8");
-  const hoverRule = /@media\s*\(hover:\s*hover\)\s*and\s*\(pointer:\s*fine\)\s*\{\s*\.orbit-scene:hover\s+\.character-star\s*\{\s*animation-play-state:\s*paused;\s*\}\s*\}/;
+  const hoverRule = /@media\s*\(hover:\s*hover\)\s*and\s*\(pointer:\s*fine\)\s*\{\s*\.orbit-scene:has\(\.character-star:hover\)\s+\.character-star\s*\{\s*animation-play-state:\s*paused;\s*\}\s*\}/;
   assert.match(css, hoverRule);
-  assert.doesNotMatch(css.replace(hoverRule, ""), /\.orbit-scene:hover/);
+  assert.doesNotMatch(css, /\.orbit-scene:hover/);
+  assert.doesNotMatch(css.replace(hoverRule, ""), /\.orbit-scene:has\(\.character-star:hover\)/);
 });
 
 test("keyboard-visible star focus pauses both stars without generic retained focus", async () => {
