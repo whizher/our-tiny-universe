@@ -248,7 +248,7 @@ button:focus-visible {
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .orbit-scene:hover .character-star {
+  .orbit-scene:has(.character-star:hover) .character-star {
     animation-play-state: paused;
   }
 }
