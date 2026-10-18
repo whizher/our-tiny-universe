@@ -14,6 +14,7 @@ https://whizher.github.io/our-tiny-universe/
 - Reduced-motion-aware orbit and shooting-star effects
 - Descriptive star controls, repeat-selection guidance, and an optional motion pause
 - English/Indonesian language handling and attributed transmission announcements
+- An interactive Tiny constellation with three connected, native milestone disclosures
 - Native sharing with clipboard/manual fallbacks
 - Privacy-bounded, dependency-free GitHub Pages build
 - Optional local “Has to Be” soundtrack with manual play/pause and a five-second crossfade loop
@@ -60,3 +61,22 @@ replace physical-device testing or listening with a real screen reader.
 - Listen with a screen reader: confirm English transmissions include the speaker, Indonesian passages use the appropriate language, and Anti-Cringe/share results are announced.
 - Check 320/360/390-pixel portrait layouts, narrow landscape, and native browser zoom at 200%/400%. Scroll and keyboard-focus lower controls to check that the fixed soundtrack player does not cover them.
 - On Android and iOS, check that no soundtrack request occurs before Play, then test Play/Pause/Resume and the five-second crossfade at the loop boundary. Check attribution and behavior after backgrounding the browser.
+
+## Tiny constellation
+
+Select a milestone's glowing star or heading to open its original story. The
+first milestone starts expanded. Browsers supporting native `details` name
+grouping keep at most one story open; other browsers can keep several open.
+The three stories remain available without JavaScript, and no selection is stored.
+
+- Use Tab and Shift+Tab to reach each milestone, then Enter or Space to toggle it.
+  Focus stays on that milestone; expanded/collapsed feedback comes from the
+  native disclosure control rather than extra ARIA attributes.
+- Check the horizontal desktop and vertical mobile layouts, including 320px
+  portrait and short landscape. Scroll and keyboard-focus every milestone to
+  check that the fixed soundtrack player does not obstruct the controls.
+- Check that reduced motion and the manual Pause motion state suppress the
+  timeline's subtle color/border transitions. No milestone or connector moves.
+- With JavaScript disabled, open every story and confirm all original labels
+  and descriptions remain readable. Actual screen-reader and physical-phone
+  behavior still require device testing.

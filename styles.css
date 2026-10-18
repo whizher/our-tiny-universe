@@ -376,6 +376,7 @@ button:focus-visible {
 
 .timeline ol {
   display: grid;
+  align-items: start;
   gap: 1rem;
   padding: 0;
   margin: 0;
@@ -384,36 +385,123 @@ button:focus-visible {
 
 .timeline li {
   position: relative;
-  display: grid;
-  gap: 0.2rem;
-  padding-left: 2rem;
-}
-
-.timeline li::before {
-  position: absolute;
-  top: 0.35rem;
-  left: 0.25rem;
-  width: 0.75rem;
-  aspect-ratio: 1;
-  content: "";
-  background: var(--gold);
-  border-radius: 50%;
-  box-shadow: 0 0 1rem var(--gold);
+  min-width: 0;
 }
 
 .timeline li:not(:last-child)::after {
   position: absolute;
-  top: 1.2rem;
-  bottom: -1rem;
-  left: 0.59rem;
+  top: 3.125rem;
+  bottom: -2.125rem;
+  left: 2.125rem;
+  z-index: 2;
   width: 1px;
   content: "";
+  pointer-events: none;
   background: var(--border);
+  box-shadow: 0 0 0.6rem rgba(188, 156, 255, 0.3);
 }
 
-.timeline span {
+.timeline-guidance {
+  margin: 0 0 1.25rem;
   color: var(--muted);
-  font-size: 0.82rem;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.timeline details {
+  min-width: 0;
+  background: rgba(8, 13, 39, 0.5);
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  transition: background-color 160ms ease, border-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.timeline details[open] {
+  background: rgba(255, 213, 106, 0.06);
+  border-color: var(--gold);
+  box-shadow: 0 0 1.25rem rgba(255, 213, 106, 0.1);
+}
+
+.timeline summary {
+  position: relative;
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1.125rem;
+  border-radius: 1rem;
+  cursor: pointer;
+  list-style: none;
+  touch-action: manipulation;
+  scroll-margin-block: 1rem 9rem;
+}
+
+.timeline summary::-webkit-details-marker {
+  display: none;
+}
+
+.timeline summary::after {
+  width: 0.45rem;
+  height: 0.45rem;
+  flex: 0 0 0.45rem;
+  margin-left: auto;
+  content: "";
+  border-right: 2px solid var(--muted);
+  border-bottom: 2px solid var(--muted);
+  transform: rotate(45deg);
+}
+
+.timeline details[open] summary::after {
+  border-color: var(--gold);
+  transform: rotate(225deg);
+}
+
+.timeline summary:focus-visible {
+  outline: 3px solid #ffffff;
+  outline-offset: 4px;
+}
+
+.timeline summary:hover {
+  background: rgba(188, 156, 255, 0.08);
+}
+
+.timeline-star {
+  position: relative;
+  z-index: 3;
+  width: 2rem;
+  height: 2rem;
+  flex: 0 0 2rem;
+  color: var(--lavender);
+  fill: currentColor;
+  filter: drop-shadow(0 0 0.45rem rgba(188, 156, 255, 0.4));
+}
+
+.timeline details[open] .timeline-star {
+  color: var(--gold);
+  filter: drop-shadow(0 0 0.6rem rgba(255, 213, 106, 0.55));
+}
+
+.timeline summary span {
+  min-width: 0;
+  color: var(--ink);
+  font-size: 0.95rem;
+  font-weight: 700;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.timeline-story {
+  padding: 0 1.125rem 1.125rem 3.875rem;
+  margin: 0;
+  color: var(--ink);
+  font-size: 0.9rem;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+:root[data-motion-paused="true"] .timeline details {
+  transition: none;
 }
 
 .anti-cringe {
@@ -595,27 +683,33 @@ button:focus-visible {
   }
 
   .timeline ol {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
-  .timeline li {
-    padding: 2rem 0 0;
+  .timeline summary {
+    min-height: 8.5rem;
+    flex-direction: column;
+    gap: 0.65rem;
     text-align: center;
   }
 
-  .timeline li::before {
-    top: 0.25rem;
-    left: 50%;
-    transform: translateX(-50%);
+  .timeline summary::after {
+    position: absolute;
+    top: 0.8rem;
+    right: 0.8rem;
   }
 
   .timeline li:not(:last-child)::after {
-    top: 0.59rem;
-    right: -50%;
+    top: 2.125rem;
     bottom: auto;
-    left: 50%;
-    width: 100%;
+    left: calc(50% + 1rem);
+    width: calc(100% - 1rem);
     height: 1px;
+  }
+
+  .timeline-story {
+    padding-left: 1.125rem;
+    text-align: center;
   }
 }
 

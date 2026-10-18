@@ -311,6 +311,120 @@ test("announces speaker and transmission together in one persistent region", asy
   assert.match(html, /<div aria-live="polite" aria-atomic="true">\s*<p[^>]*data-share-status/);
 });
 
+async function readTimelineDisclosures() {
+  const html = await readFile("index.html", "utf8");
+  const timeline = html.match(/<section\b[^>]*class="timeline"[^>]*>([\s\S]*?)<\/section>/)?.[1] || "";
+  return [...timeline.matchAll(/<details\b([^>]*)>([\s\S]*?)<\/details>/g)]
+    .map(([, attributes, content]) => {
+      const summary = content.match(/<summary\b([^>]*)>([\s\S]*?)<\/summary>/);
+      return {
+        attributes,
+        summaryAttributes: summary?.[1] || "",
+        summary: summary?.[2] || "",
+        story: content.replace(summary?.[0] || "", ""),
+      };
+    });
+}
+
+function readableMarkupText(markup) {
+  return markup.replace(/<svg\b[\s\S]*?<\/svg>/g, "")
+    .replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+}
+
+test("timeline exposes the three original stories through named native disclosures", async () => {
+  const disclosures = await readTimelineDisclosures();
+  assert.equal(disclosures.length, 3, "all milestones need a native disclosure");
+  const expected = [
+    ["Long before the orbit", "The lore had already started."],
+    ["7 Juli 2024", "Officially one orbit."],
+    ["Today", "Same chaos, more teamwork."],
+  ];
+  assert.deepEqual(disclosures.map(({ summary, story }) => [
+    readableMarkupText(summary), readableMarkupText(story),
+  ]), expected);
+  for (const disclosure of disclosures) {
+    assert.doesNotMatch(disclosure.attributes + disclosure.story, /\bhidden\b/);
+    assert.doesNotMatch(disclosure.summaryAttributes, /\b(?:role|tabindex|aria-[\w-]+)\s*=/);
+    assert.doesNotMatch(disclosure.summary, /<(?:a|button|input|select|textarea)\b/);
+  }
+});
+
+test("timeline uses one native disclosure group with only the first story initially open", async () => {
+  const disclosures = await readTimelineDisclosures();
+  assert.equal(disclosures.length, 3);
+  const groups = disclosures.map(({ attributes }) => attributes.match(/\bname="([^"]+)"/)?.[1]);
+  assert.ok(groups.every(Boolean), "native exclusive grouping needs a nonempty name");
+  assert.equal(new Set(groups).size, 1, "all three disclosures must share one group");
+  assert.deepEqual(disclosures.map(({ attributes }) => /\bopen(?:\s|=|$)/.test(attributes)), [true, false, false]);
+});
+
+test("timeline decorative stars stay out of accessible milestone names and keyboard order", async () => {
+  const disclosures = await readTimelineDisclosures();
+  assert.equal(disclosures.length, 3);
+  for (const { summary } of disclosures) {
+    const icons = [...summary.matchAll(/<svg\b([^>]*)>/g)];
+    assert.equal(icons.length, 1);
+    assert.match(icons[0][1], /\baria-hidden="true"/);
+    assert.match(icons[0][1], /\bfocusable="false"/);
+    assert.doesNotMatch(icons[0][1], /\btabindex\s*=/);
+  }
+});
+
+test("timeline disclosure controls retain touch-sized targets and visible keyboard focus", async () => {
+  const css = await readFile("styles.css", "utf8");
+  const summaryRules = css.match(/\.timeline summary\s*\{([^}]*)\}/)?.[1] || "";
+  const minimumHeight = Number(summaryRules.match(/min-height:\s*([\d.]+)px;/)?.[1]);
+  assert.ok(minimumHeight >= 44, "summary hit targets must be at least 44px high");
+  const focusRules = css.match(/\.timeline summary:focus-visible\s*\{([^}]*)\}/)?.[1] || "";
+  assert.match(focusRules, /outline:\s*3px solid #ffffff;/);
+  assert.match(focusRules, /outline-offset:\s*4px;/);
+});
+
+test("timeline transitions honor manual pause as well as reduced-motion preference", async () => {
+  const css = await readFile("styles.css", "utf8");
+  const manualPause = css.match(/:root\[data-motion-paused="true"\] \.timeline details\s*\{([^}]*)\}/)?.[1] || "";
+  assert.match(manualPause, /transition:\s*none;/);
+  const reducedMotion = css.slice(css.indexOf("@media (prefers-reduced-motion: reduce)"));
+  assert.match(reducedMotion, /transition-duration:\s*0\.01ms\s*!important;/);
+});
+
+test("timeline story contrast remains readable even over a bright translucent backdrop", async () => {
+  const css = await readFile("styles.css", "utf8");
+  const variables = new Map([...css.matchAll(/(--[\w-]+):\s*([^;]+);/g)]
+    .map(([, name, value]) => [name, value]));
+  function color(value) {
+    const variable = value.match(/^var\((--[\w-]+)\)$/)?.[1];
+    if (variable) return color(variables.get(variable));
+    if (/^#[\da-f]{6}$/i.test(value)) {
+      return [1, 3, 5].map((offset) => parseInt(value.slice(offset, offset + 2), 16));
+    }
+    assert.match(value, /^rgba?\([\d.,\s]+\)$/);
+    return value.match(/[\d.]+/g).map(Number);
+  }
+  function paint(foreground, background) {
+    const alpha = foreground[3] ?? 1;
+    return foreground.slice(0, 3).map((channel, index) =>
+      channel * alpha + background[index] * (1 - alpha));
+  }
+  function luminance(rgb) {
+    const channels = rgb.map((channel) => {
+      const value = channel / 255;
+      return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+    });
+    return channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722;
+  }
+  const selectedCard = css.match(/\.timeline details\[open\]\s*\{([^}]*)\}/)?.[1] || "";
+  const story = css.match(/\.timeline-story\s*\{([^}]*)\}/)?.[1] || "";
+  const foreground = color(story.match(/\bcolor:\s*([^;]+);/)?.[1]);
+  const card = color(selectedCard.match(/\bbackground:\s*([^;]+);/)?.[1]);
+  // A white backdrop bounds any lighter pixel behind the translucent panel.
+  const background = paint(card, paint(color(variables.get("--panel")), [255, 255, 255]));
+  const light = Math.max(luminance(foreground), luminance(background));
+  const dark = Math.min(luminance(foreground), luminance(background));
+  const ratio = (light + 0.05) / (dark + 0.05);
+  assert.ok(ratio >= 4.5, `story contrast ${ratio.toFixed(2)}:1 is below 4.5:1`);
+});
+
 test("star controls explain their result and share repeated-selection guidance", async () => {
   const html = await readFile("index.html", "utf8");
   for (const name of ["Naufal", "Rity"]) {
