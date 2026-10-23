@@ -57,3 +57,21 @@ export function millisecondsUntilNextPontianakMidnight(date = new Date()) {
     Date.UTC(year, month - 1, day + 1) - WIB_OFFSET_MS;
   return Math.max(0, nextMidnightUtc - date.getTime());
 }
+
+export function capsuleCelebrationState(date = new Date()) {
+  const current = pontianakParts(date);
+  const anniversaryNumber = current.year - START_DATE.year;
+  return {
+    isAnniversary: anniversaryNumber > 0 &&
+      current.month === START_DATE.month && current.day === START_DATE.day,
+    anniversaryNumber,
+  };
+}
+
+export function isAnniversaryNoteEligible(year, date = new Date()) {
+  const current = pontianakParts(date);
+  if (!Number.isInteger(year) || year < 2027) return false;
+  return current.year > year || (current.year === year &&
+    (current.month > START_DATE.month ||
+      (current.month === START_DATE.month && current.day >= START_DATE.day)));
+}
