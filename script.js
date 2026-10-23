@@ -1,5 +1,6 @@
 import {
   anniversaryState,
+  capsuleCelebrationState,
   daysTogether,
   millisecondsUntilNextPontianakMidnight,
 } from "./src/time.mjs";
@@ -84,6 +85,7 @@ export async function shareUniverse({
 
 export function initSite({
   documentRef = document,
+  windowRef = documentRef.defaultView,
   now = () => new Date(),
   random = Math.random,
   schedule = setTimeout,
@@ -106,6 +108,8 @@ export function initSite({
   createSoundtrack = createCrossfadeController,
 } = {}) {
   const counter = documentRef.querySelector("[data-days]");
+  const capsule = documentRef.querySelector("[data-capsule]");
+  const capsuleStatus = documentRef.querySelector("[data-capsule-status]");
   const universe = documentRef.querySelector("[data-universe]");
   const anniversaryStatus = documentRef.querySelector(
     "[data-anniversary-status]",
@@ -128,6 +132,8 @@ export function initSite({
 
   const required = [
     counter,
+    capsule,
+    capsuleStatus,
     universe,
     anniversaryStatus,
     messageTitle,
@@ -171,6 +177,8 @@ export function initSite({
   let anniversaryActive = false;
   let motionPaused = false;
   let soundtrackLoaded = false;
+  let destroyed = false;
+  let midnightGeneration = 0;
 
   function motionSuppressed() {
     return motionPaused || reducedMotion();
@@ -217,13 +225,14 @@ export function initSite({
       ...specs.map((spec) => spec.delayMs + spec.durationMs),
     );
     cleanupTimer = schedule(
-      () => shootingLayer.replaceChildren(),
+      () => {
+        if (!destroyed) shootingLayer.replaceChildren();
+      },
       maximumLifetime + 160,
     );
   }
 
-  function renderTemporalState() {
-    const current = now();
+  function renderTemporalState(current) {
     counter.textContent =
       "Sudah " + daysTogether(current) + " hari di orbit yang sama.";
     const state = anniversaryState(current);
@@ -237,13 +246,39 @@ export function initSite({
       renderShootingStars("anniversary");
     }
     anniversaryActive = state.isAnniversary;
+
+    const celebration = capsuleCelebrationState(current);
+    const celebrating = String(celebration.isAnniversary);
+    if (capsule.dataset.celebrating !== celebrating) {
+      capsule.dataset.celebrating = celebrating;
+    }
+    const status = celebration.isAnniversary
+      ? "Happy anniversary · " + celebration.anniversaryNumber +
+        (celebration.anniversaryNumber === 1 ? " year together" : " years together")
+      : "";
+    if (capsuleStatus.textContent !== status) capsuleStatus.textContent = status;
+    if (capsuleStatus.hidden !== !celebration.isAnniversary) {
+      capsuleStatus.hidden = !celebration.isAnniversary;
+    }
   }
 
-  function scheduleCounterUpdate() {
+  function refreshTemporalState() {
+    if (destroyed) return;
+    cancelSchedule(midnightTimer);
+    const generation = ++midnightGeneration;
+    const current = now();
+    renderTemporalState(current);
     midnightTimer = schedule(() => {
-      renderTemporalState();
-      scheduleCounterUpdate();
-    }, millisecondsUntilNextPontianakMidnight(now()) + 50);
+      if (!destroyed && generation === midnightGeneration) refreshTemporalState();
+    }, millisecondsUntilNextPontianakMidnight(current) + 50);
+  }
+
+  function onVisibilityChange() {
+    if (documentRef.visibilityState === "visible") refreshTemporalState();
+  }
+
+  function onPageHide(event) {
+    if (!event.persisted) destroy();
   }
 
   function scheduleAmbientMeteor() {
@@ -257,6 +292,7 @@ export function initSite({
         : CALM_AMBIENT_RANGE;
 
     ambientTimer = schedule(() => {
+      if (destroyed) return;
       renderShootingStars("ambient");
       scheduleAmbientMeteor();
     }, randomDelay(range, random));
@@ -380,9 +416,11 @@ export function initSite({
     }
   }
 
-  renderTemporalState();
-  scheduleCounterUpdate();
+  refreshTemporalState();
   scheduleAmbientMeteor();
+  documentRef.addEventListener("visibilitychange", onVisibilityChange);
+  windowRef?.addEventListener("pageshow", refreshTemporalState);
+  windowRef?.addEventListener("pagehide", onPageHide);
   motionButton.hidden = false;
   motionButton.addEventListener("click", toggleMotion);
   stars.forEach((star) => star.addEventListener("click", revealMessage));
@@ -390,38 +428,32 @@ export function initSite({
   shareButton.addEventListener("click", launchShare);
   musicButton.addEventListener("click", toggleSoundtrack);
 
-  return {
-    destroy() {
-      stars.forEach((star) =>
-        star.removeEventListener("click", revealMessage),
-      );
-      antiButton.removeEventListener("click", launchAntiCringe);
-      shareButton.removeEventListener("click", launchShare);
-      musicButton.removeEventListener("click", toggleSoundtrack);
-      motionButton.removeEventListener("click", toggleMotion);
-      delete documentRef.documentElement.dataset.motionPaused;
-      soundtrack.destroy();
-      cancelSchedule(midnightTimer);
-      cancelSchedule(ambientTimer);
-      cancelSchedule(cleanupTimer);
-      shootingLayer.replaceChildren();
-    },
-  };
+  function destroy() {
+    if (destroyed) return;
+    destroyed = true;
+    midnightGeneration++;
+    documentRef.removeEventListener("visibilitychange", onVisibilityChange);
+    windowRef?.removeEventListener("pageshow", refreshTemporalState);
+    windowRef?.removeEventListener("pagehide", onPageHide);
+    stars.forEach((star) =>
+      star.removeEventListener("click", revealMessage),
+    );
+    antiButton.removeEventListener("click", launchAntiCringe);
+    shareButton.removeEventListener("click", launchShare);
+    musicButton.removeEventListener("click", toggleSoundtrack);
+    motionButton.removeEventListener("click", toggleMotion);
+    delete documentRef.documentElement.dataset.motionPaused;
+    soundtrack.destroy();
+    cancelSchedule(midnightTimer);
+    cancelSchedule(ambientTimer);
+    cancelSchedule(cleanupTimer);
+    shootingLayer.replaceChildren();
+  }
+  return { destroy };
 }
 
 function startSite() {
-  const site = initSite();
-  if (typeof window !== "undefined") {
-    window.addEventListener(
-      "pagehide",
-      (event) => {
-        if (!event.persisted) {
-          site.destroy();
-        }
-      },
-      { once: true },
-    );
-  }
+  initSite();
 }
 
 if (typeof document !== "undefined") {

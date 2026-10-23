@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
+import { START_DATE, isAnniversaryNoteEligible } from "../src/time.mjs";
 import {
   cp,
   mkdir,
@@ -33,6 +34,127 @@ async function listFiles(directory, prefix = "") {
   }
   return files.sort();
 }
+
+function capsuleMarkup(html) {
+  const capsule = html.match(/<section\b[^>]*class="anniversary-capsule"[^>]*>([\s\S]*?)<\/section>/)?.[0];
+  assert.ok(capsule, "permanent capsule must exist in static HTML");
+  return capsule;
+}
+
+function inlineText(html) {
+  return html.replace(/<[^>]*>/g, "")
+    .replace(/&#(\d+);/g, (_, code) => String.fromCodePoint(Number(code)))
+    .replace(/&#x([\da-f]+);/gi, (_, code) => String.fromCodePoint(parseInt(code, 16)))
+    .replace(/&quot;/g, '"').replace(/&apos;|&#39;/g, "'")
+    .replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&")
+    .replace(/\s+/g, " ").trim();
+}
+
+function letterCanonicalBlocks(article) {
+  return [...article.matchAll(/<(h3|p)\b[^>]*>([\s\S]*?)<\/\1>/g)].map(([, tag, body]) => {
+    const spans = [...body.matchAll(/<(strong|em)\b[^>]*>([\s\S]*?)<\/\1>/g)].map(match => {
+      const prefix = inlineText(body.slice(0, match.index));
+      const before = body.slice(0, match.index).replace(/<[^>]*>/g, "");
+      const start = prefix.length + (/\s$/.test(before) ? 1 : 0);
+      return [match[1], start, start + inlineText(match[2]).length];
+    });
+    return [tag, inlineText(body), spans];
+  });
+}
+
+function assertNoteInventory(html, now) {
+  const cards = [...html.matchAll(/<details\b([^>]*\bdata-anniversary-note-year\b[^>]*)>([\s\S]*?)<\/details>/g)];
+  let previous = 2026;
+  for (const [, attributes, body] of cards) {
+    const years = [...attributes.matchAll(/\bdata-anniversary-note-year="(\d{4})"/g)];
+    assert.equal(years.length, 1, "one strict calendar-year attribute required");
+    const year = Number(years[0][1]);
+    assert.ok(year > previous, "notes must be unique and chronological, starting in 2027");
+    previous = year;
+    assert.ok(isAnniversaryNoteEligible(year, now), "note anniversary has not arrived");
+    const summary = body.match(/<summary\b[^>]*>([\s\S]*?)<\/summary>/)?.[1];
+    assert.ok(summary, "note needs a native summary");
+    const number = year - START_DATE.year;
+    const suffix = number % 100 >= 11 && number % 100 <= 13 ? "th" : ({ 1: "st", 2: "nd", 3: "rd" }[number % 10] || "th");
+    assert.match(inlineText(summary), new RegExp(`^${number}${suffix} anniversary`));
+    const month = String(START_DATE.month).padStart(2, "0");
+    const day = String(START_DATE.day).padStart(2, "0");
+    assert.match(summary, new RegExp(`<time\\b[^>]*datetime="${year}-${month}-${day}"`));
+    assert.match(inlineText(summary.match(/<time\b[^>]*>([\s\S]*?)<\/time>/)?.[1] || ""), new RegExp(`^7 July ${year}$`));
+    const content = body.replace(/<summary\b[^>]*>[\s\S]*?<\/summary>/, "");
+    assert.ok(inlineText(content).length > 0, "note body must not be empty");
+    assert.doesNotMatch(attributes, /\bname\s*=|\bopen\b/);
+  }
+  assert.equal((html.match(/\bdata-anniversary-note-year\b/g) || []).length, cards.length,
+    "note metadata must belong to a complete native card");
+  return cards.length;
+}
+
+test("capsule is a closed independent native keepsake between timeline and Anti-Cringe", async () => {
+  const html = await readFile("index.html", "utf8");
+  const capsule = capsuleMarkup(html);
+  assert.ok(html.indexOf('class="timeline"') < html.indexOf(capsule));
+  assert.ok(html.indexOf(capsule) < html.indexOf('class="anti-cringe"'));
+  assert.match(capsule, /aria-labelledby="capsule-title"/);
+  assert.match(capsule, /<h2 id="capsule-title">Anniversary Capsule<\/h2>/);
+  assert.match(capsule, /<details class="eternal-letter">/);
+  const summary = capsule.match(/<summary\b[^>]*>([\s\S]*?)<\/summary>/)?.[1];
+  assert.equal(inlineText(summary), "Eternal Letter from Naufal to Rity");
+  assert.match(summary, /<svg[^>]*aria-hidden="true"[^>]*focusable="false"/);
+  assert.doesNotMatch(capsule, /\bname=|\btabindex=|aria-expanded|aria-pressed|<button|<a\b|<dialog/);
+  assert.match(capsule, /<article[^>]*aria-labelledby="eternal-letter-title"/);
+  const status = capsule.match(/<div[^>]*aria-live="polite"[^>]*>([\s\S]*?)<\/div>/)?.[1];
+  assert.match(status, /<p[^>]*data-capsule-status[^>]*hidden/);
+  assert.doesNotMatch(status, /<article|<details/);
+});
+
+test("capsule letter exactly matches the private approved manuscript block and emphasis digest", async () => {
+  const html = capsuleMarkup(await readFile("index.html", "utf8"));
+  const article = html.match(/<article\b[^>]*>([\s\S]*?)<\/article>/)?.[1] || "";
+  const blocks = letterCanonicalBlocks(article);
+  assert.equal(blocks.length, 22);
+  // Derived from Appendix A before candidate generation; no duplicate manuscript fixture.
+  assert.equal(createHash("sha256").update(JSON.stringify(blocks)).digest("hex"),
+    "5e64ca9dedfcb036798fbb647302f9dd382456f0eca5daaf04375d490a703417");
+  assert.match(article, /<p lang="id">Aku nggak tahu persis[\s\S]*?<span lang="en">[^<]+<\/span>/);
+  assert.match(article, /<p lang="id">Bintang-bintang[\s\S]*?<strong lang="en">[^<]+<\/strong>/);
+  assert.equal((article.match(/<p\b/g) || []).length, 21);
+});
+
+test("capsule publication inventory rejects invalid, premature and empty synthetic notes", () => {
+  const card = (year = 2027, number = "3rd", date = "2027-07-07", content = "Synthetic policy fixture.") =>
+    `<details data-anniversary-note-year="${year}"><summary>${number} anniversary · <time datetime="${date}">7 July ${year}</time></summary><p>${content}</p></details>`;
+  const late = new Date("2027-07-10T00:00:00Z");
+  assert.equal(assertNoteInventory(card(), late), 1);
+  assert.equal(assertNoteInventory(card(), new Date("2030-01-01Z")), 1);
+  for (const bad of [card(2025), card(2026), card("oops"), card(2027, "4th"),
+    card(2027, "3th"), card(2027, "3rd", "2027-07-32"), card(2027, "3rd", "2027-07-08"),
+    card(2027, "3rd", "2027-07-07", "  "), card() + card(),
+    card(2028, "4th", "2028-07-07"), '<p data-anniversary-note-year="2027">fixture</p>']) {
+    assert.throws(() => assertNoteInventory(bad, late));
+  }
+  assert.throws(() => assertNoteInventory(card(), new Date("2027-07-06T16:59:59.999Z")));
+  assert.equal(assertNoteInventory(card(), new Date("2027-07-06T17:00:00Z")), 1);
+  assert.throws(() => assertNoteInventory(card(2028, "4th", "2028-07-07") + card(), new Date("2030-01-01Z")));
+});
+
+test("capsule launch contains no unpublished annual cards or empty archive collection", async () => {
+  const html = await readFile("index.html", "utf8");
+  const current = new Date();
+  assert.equal(assertNoteInventory(html, current), 0);
+  assert.doesNotMatch(capsuleMarkup(html), /anniversary-notes|<ol|<ul|data-anniversary-note-year/);
+});
+
+test("capsule styling keeps a static readable star and respects both motion preferences", async () => {
+  const css = await readFile("styles.css", "utf8");
+  assert.match(css, /\.capsule-summary\s*\{[^}]*min-height:\s*44px;/);
+  assert.match(css, /\.capsule-summary:focus-visible[^}]*outline:\s*3px solid #ffffff;/);
+  assert.match(css, /\.capsule-letter\s*\{[^}]*max-width:\s*65ch;[^}]*font-size:\s*1rem;[^}]*line-height:\s*1\.7;/);
+  assert.match(css, /:root\[data-motion-paused="true"\] \.anniversary-capsule details\s*\{\s*transition:\s*none;/);
+  const reduced = css.slice(css.indexOf("@media (prefers-reduced-motion: reduce)"));
+  assert.match(reduced, /\.anniversary-capsule details\s*\{\s*transition:\s*none;/);
+  assert.doesNotMatch(css.match(/\.celestial-star\s*\{([^}]*)\}/)?.[1] || "", /\banimation\s*:|\btransform\s*:/);
+});
 
 async function validateFixture({
   indexHtml,

@@ -35,6 +35,15 @@ class FakeElement {
     this.listeners.set(type, listeners);
   }
 
+  set textContent(value) {
+    this._textContent = value;
+    this.textWrites = (this.textWrites || 0) + 1;
+  }
+
+  get textContent() {
+    return this._textContent;
+  }
+
   removeEventListener(type, listener) {
     const listeners = this.listeners.get(type) || [];
     this.listeners.set(
@@ -59,8 +68,8 @@ class FakeElement {
     );
   }
 
-  emit(type) {
-    for (const listener of this.listeners.get(type) || []) listener();
+  emit(type, event = {}) {
+    for (const listener of [...(this.listeners.get(type) || [])]) listener(event);
   }
 
   async play() {
@@ -86,6 +95,7 @@ function createSoundtrackFake() {
   let state = "idle";
   let notify = () => {};
   let destroyed = false;
+  let destructionCount = 0;
   return {
     factory({ channels, onStateChange }) {
       assert.equal(channels.length, 2);
@@ -93,6 +103,7 @@ function createSoundtrackFake() {
       onStateChange(state);
       return {
         destroy() {
+          destructionCount += 1;
           destroyed = true;
           state = "destroyed";
         },
@@ -114,6 +125,7 @@ function createSoundtrackFake() {
     },
     getState: () => state,
     wasDestroyed: () => destroyed,
+    destructionCount: () => destructionCount,
   };
 }
 
@@ -129,6 +141,9 @@ function createFixture() {
     counter: new FakeElement(),
     universe: new FakeElement(),
     anniversaryStatus: new FakeElement(),
+    capsule: new FakeElement(),
+    capsuleStatus: new FakeElement(),
+    letter: new FakeElement(),
     messageTitle: new FakeElement(),
     message: new FakeElement(),
     antiButton: new FakeElement(),
@@ -151,6 +166,8 @@ function createFixture() {
     ["[data-days]", elements.counter],
     ["[data-universe]", elements.universe],
     ["[data-anniversary-status]", elements.anniversaryStatus],
+    ["[data-capsule]", elements.capsule],
+    ["[data-capsule-status]", elements.capsuleStatus],
     ["[data-message-title]", elements.messageTitle],
     ["[data-message]", elements.message],
     ["[data-anti-cringe]", elements.antiButton],
@@ -163,7 +180,9 @@ function createFixture() {
     ["[data-music-status]", elements.musicStatus],
     ["[data-motion-toggle]", elements.motionButton],
   ]);
-  const documentRef = {
+  const documentRef = Object.assign(new FakeElement(), {
+    visibilityState: "visible",
+    defaultView: new FakeElement(),
     documentElement: new FakeElement(),
     querySelector: (selector) => selectors.get(selector) || null,
     querySelectorAll: (selector) =>
@@ -173,9 +192,142 @@ function createFixture() {
           ? elements.audioChannels
           : [],
     createElement: () => new FakeElement(),
-  };
+  });
   return { documentRef, elements };
 }
+
+function capsuleHarness({ instant = "2027-07-06T16:59:59.999Z", reduce = true } = {}) {
+  const fixture = createFixture();
+  const pending = new Map();
+  const history = new Map();
+  const soundtrack = createSoundtrackFake();
+  let current = new Date(instant);
+  let clockReads = 0;
+  let id = 0;
+  const site = initProductionSite({
+    documentRef: fixture.documentRef,
+    now: () => { clockReads++; return current; },
+    reducedMotion: () => reduce,
+    createSoundtrack: soundtrack.factory,
+    schedule: (callback, delay) => {
+      const entry = { callback, delay };
+      pending.set(++id, entry);
+      history.set(id, entry);
+      return id;
+    },
+    cancelSchedule: key => pending.delete(key),
+  });
+  return { ...fixture, site, pending, history, soundtrack,
+    setTime: value => { current = new Date(value); },
+    clockReads: () => clockReads,
+    fireMidnight() {
+      const [key, entry] = [...pending][0];
+      pending.delete(key);
+      entry.callback();
+    },
+  };
+}
+
+test("capsule temporal initialization captures one clock and leaves permanent disclosure alone", () => {
+  const h = capsuleHarness();
+  assert.equal(h.clockReads(), 1);
+  assert.equal(h.pending.size, 1);
+  assert.equal(h.elements.capsuleStatus.hidden, true);
+  assert.equal(h.elements.capsuleStatus.textContent, "");
+  assert.equal(h.elements.capsule.dataset.celebrating, "false");
+  assert.equal(h.elements.letter.hidden, false);
+});
+
+test("capsule midnight entry and exit preserve an open letter, focus and audio state", () => {
+  const h = capsuleHarness();
+  const letter = h.elements.letter;
+  letter.open = true;
+  letter.scrollTop = 120;
+  h.documentRef.activeElement = letter;
+  h.setTime("2027-07-06T17:00:00Z");
+  h.fireMidnight();
+  assert.equal(h.elements.capsuleStatus.textContent, "Happy anniversary · 3 years together");
+  assert.equal(h.elements.capsuleStatus.hidden, false);
+  assert.equal(h.elements.capsule.dataset.celebrating, "true");
+  h.setTime("2027-07-07T17:00:00Z");
+  h.fireMidnight();
+  assert.equal(h.elements.capsuleStatus.hidden, true);
+  assert.equal(h.elements.capsule.dataset.celebrating, "false");
+  assert.equal(h.elements.letter, letter);
+  assert.equal(letter.open, true);
+  assert.equal(letter.scrollTop, 120);
+  assert.equal(h.documentRef.activeElement, letter);
+  assert.equal(h.soundtrack.getState(), "idle");
+  assert.ok(h.elements.audioChannels.every(channel => channel.getAttribute("src") === null));
+  assert.equal(h.pending.size, 1);
+});
+
+test("capsule hidden-to-visible and duplicate pageshow refreshes replace one midnight timer", () => {
+  const h = capsuleHarness();
+  const oldCallback = [...h.pending.values()][0].callback;
+  const reads = h.clockReads();
+  h.documentRef.visibilityState = "hidden";
+  h.documentRef.emit("visibilitychange");
+  assert.equal(h.clockReads(), reads);
+  h.setTime("2027-07-06T17:00:00Z");
+  h.documentRef.visibilityState = "visible";
+  h.documentRef.emit("visibilitychange");
+  assert.equal(h.elements.capsuleStatus.hidden, false);
+  assert.equal(h.elements.capsuleStatus.textContent, "Happy anniversary · 3 years together");
+  const writes = h.elements.capsuleStatus.textWrites;
+  for (let i = 0; i < 4; i++) h.documentRef.defaultView.emit("pageshow", { persisted: true });
+  assert.equal(h.pending.size, 1);
+  assert.equal(h.elements.capsuleStatus.textWrites, writes);
+  const currentCallback = [...h.pending.values()][0].callback;
+  oldCallback();
+  assert.equal([...h.pending.values()][0].callback, currentCallback);
+});
+
+test("capsule repeated persisted cache cycles retain cleanup until a final departure", () => {
+  const h = capsuleHarness();
+  for (let i = 0; i < 2; i++) {
+    h.documentRef.defaultView.emit("pagehide", { persisted: true });
+    assert.equal(h.soundtrack.wasDestroyed(), false);
+    h.documentRef.defaultView.emit("pageshow", { persisted: true });
+    assert.equal(h.pending.size, 1);
+  }
+  const callbacks = [...h.history.values()].map(entry => entry.callback);
+  h.documentRef.defaultView.emit("pagehide", { persisted: false });
+  assert.equal(h.soundtrack.destructionCount(), 1);
+  assert.equal(h.pending.size, 0);
+  h.site.destroy();
+  callbacks.forEach(callback => callback());
+  h.documentRef.defaultView.emit("pageshow");
+  h.documentRef.emit("visibilitychange");
+  assert.equal(h.pending.size, 0);
+  assert.equal(h.soundtrack.destructionCount(), 1);
+  for (const event of ["pageshow", "pagehide"]) assert.equal(h.documentRef.defaultView.listeners.get(event).length, 0);
+  assert.equal(h.documentRef.listeners.get("visibilitychange").length, 0);
+});
+
+test("capsule restore deduplicates anniversary announcement and meteor flourish", () => {
+  const h = capsuleHarness({ instant: "2027-07-07T05:00:00Z", reduce: false });
+  const particles = h.elements.layer.children;
+  const writes = h.elements.capsuleStatus.textWrites;
+  const reads = h.clockReads();
+  h.documentRef.defaultView.emit("pageshow", { persisted: true });
+  h.documentRef.emit("visibilitychange");
+  assert.equal(h.clockReads(), reads + 2);
+  assert.equal(h.elements.layer.children, particles);
+  assert.equal(h.elements.capsuleStatus.textWrites, writes);
+  assert.equal(h.soundtrack.getState(), "idle");
+});
+
+test("capsule first anniversary is singular and a rolled-back clock never hides the keepsake", () => {
+  const h = capsuleHarness({ instant: "2025-07-07T05:00:00Z" });
+  assert.equal(h.elements.capsuleStatus.textContent, "Happy anniversary · 1 year together");
+  h.elements.letter.open = true;
+  h.setTime("2023-07-07T05:00:00Z");
+  h.documentRef.defaultView.emit("pageshow");
+  assert.equal(h.elements.capsuleStatus.hidden, true);
+  assert.equal(h.elements.letter.hidden, false);
+  assert.equal(h.elements.letter.open, true);
+});
 
 test("loads both local soundtrack channels only after Play", async () => {
   const { documentRef, elements } = createFixture();

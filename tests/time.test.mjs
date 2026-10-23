@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import * as time from "../src/time.mjs";
 import {
   START_DATE,
   TIME_ZONE,
@@ -65,4 +66,45 @@ test("anniversary state rejects invalid dates", () => {
     () => anniversaryState(new Date("invalid")),
     TypeError,
   );
+});
+
+test("capsule celebrates positive calendar anniversaries without changing legacy state", () => {
+  for (const [year, number] of [[2023, -1], [2024, 0], [2025, 1], [2026, 2], [2027, 3], [2028, 4]]) {
+    const date = new Date(`${year}-07-07T05:00:00Z`);
+    assert.deepEqual(time.capsuleCelebrationState(date), {
+      isAnniversary: number > 0, anniversaryNumber: number,
+    });
+    assert.deepEqual(Object.keys(anniversaryState(date)), ["isAnniversary", "daysUntilNext"]);
+  }
+});
+
+test("capsule celebration and note eligibility use exact Pontianak entry and exit boundaries", () => {
+  for (const [instant, celebrating, eligible] of [
+    ["2027-07-06T16:59:59.999Z", false, false],
+    ["2027-07-06T17:00:00.000Z", true, true],
+    ["2027-07-07T16:59:59.999Z", true, true],
+    ["2027-07-07T17:00:00.000Z", false, true],
+  ]) {
+    const date = new Date(instant);
+    assert.deepEqual(time.capsuleCelebrationState(date), { isAnniversary: celebrating, anniversaryNumber: 3 });
+    assert.equal(time.isAnniversaryNoteEligible(2027, date), eligible);
+  }
+});
+
+test("published-note eligibility survives late publication, leap years and clock calendar changes", () => {
+  for (const instant of ["2027-07-10T00:00:00Z", "2028-02-29T12:00:00Z", "2030-01-01T00:00:00Z"]) {
+    assert.equal(time.isAnniversaryNoteEligible(2027, new Date(instant)), true);
+  }
+  assert.equal(time.isAnniversaryNoteEligible(2028, new Date("2028-07-06T16:59:59Z")), false);
+  assert.equal(time.isAnniversaryNoteEligible(2028, new Date("2028-07-06T17:00:00Z")), true);
+  assert.deepEqual(time.capsuleCelebrationState(new Date("2027-07-07T00:00:00+07:00")),
+    time.capsuleCelebrationState(new Date("2027-07-06T13:00:00-04:00")));
+});
+
+test("note years reject retrospective and malformed values while invalid dates throw", () => {
+  for (const year of [2025, 2026, "2027", 2027.5, NaN, Infinity, -Infinity, null]) {
+    assert.equal(time.isAnniversaryNoteEligible(year, new Date("2030-01-01Z")), false);
+  }
+  assert.throws(() => time.capsuleCelebrationState(new Date("invalid")), TypeError);
+  assert.throws(() => time.isAnniversaryNoteEligible(2027, new Date("invalid")), TypeError);
 });
