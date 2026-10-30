@@ -156,6 +156,71 @@ test("capsule styling keeps a static readable star and respects both motion pref
   assert.doesNotMatch(css.match(/\.celestial-star\s*\{([^}]*)\}/)?.[1] || "", /\banimation\s*:|\btransform\s*:/);
 });
 
+function cssBlock(source, header) {
+  const match = source.match(header);
+  assert.ok(match, `missing CSS contract: ${header}`);
+  const opening = source.indexOf("{", match.index);
+  let depth = 1;
+  for (let cursor = opening + 1; cursor < source.length; cursor += 1) {
+    if (source[cursor] === "{") depth += 1;
+    if (source[cursor] === "}") depth -= 1;
+    if (depth === 0) return source.slice(opening + 1, cursor);
+  }
+  assert.fail("unclosed CSS block");
+}
+
+function capsuleAnimation(css, selector) {
+  const rule = cssBlock(css, selector);
+  const animation = rule.match(/\banimation:\s*([\w-]+)\s+(\d+)ms\s+([^;]+);/);
+  assert.ok(animation, "open disclosure must have a finite timed animation");
+  assert.doesNotMatch(animation[0], /infinite|forwards|both|paused/);
+  return {
+    duration: Number(animation[2]),
+    frames: cssBlock(css, new RegExp(`@keyframes\\s+${animation[1]}\\s*\\{`)),
+  };
+}
+
+test("celestial reveal keeps resting text readable and limits opening to a short five-pixel rise", async () => {
+  const css = await readFile("styles.css", "utf8");
+  const reveal = capsuleAnimation(css, /\.eternal-letter\[open\]\s*>\s*\.capsule-letter\s*\{/);
+  assert.ok(reveal.duration >= 250 && reveal.duration <= 350, "letter reveal stays near 300ms");
+  const start = cssBlock(reveal.frames, /from\s*\{/);
+  const finish = cssBlock(reveal.frames, /to\s*\{/);
+  assert.match(start, /opacity:\s*0\s*;/);
+  const rise = start.match(/transform:\s*translateY\((\d+(?:\.\d+)?)px\)/);
+  assert.ok(rise && Number(rise[1]) >= 4 && Number(rise[1]) <= 6, "opening rises only 4–6px");
+  assert.match(finish, /opacity:\s*1\s*;/);
+  assert.match(finish, /transform:\s*translateY\(0\)/);
+  assert.doesNotMatch(reveal.frames, /\b(?:margin|padding|height|width|top|bottom|left|right)\s*:/);
+  const resting = cssBlock(css, /(?:^|\n)\.capsule-letter\s*\{/);
+  assert.doesNotMatch(resting, /\b(?:animation|opacity|transform|visibility)\s*:/,
+    "resting readability must not depend on animation fill or JavaScript");
+});
+
+test("celestial reveal halo is finite and changes only glow, never star position", async () => {
+  const css = await readFile("styles.css", "utf8");
+  const halo = capsuleAnimation(css, /\.eternal-letter\[open\]\s+\.celestial-star\s*\{/);
+  assert.ok(halo.duration >= 100 && halo.duration <= 800, "halo settles promptly");
+  const properties = [...halo.frames.matchAll(/(?:^|[;{])\s*([a-z-]+)\s*:/g)].map(match => match[1]);
+  assert.deepEqual([...new Set(properties)], ["filter"], "the halo must not move or flash the star");
+  assert.match(halo.frames, /drop-shadow/);
+  assert.doesNotMatch(halo.frames, /\b(?:transform|translate|rotate|scale|opacity)\s*:/);
+});
+
+test("celestial reveal cancels both effects rather than freezing them under either motion opt-out", async () => {
+  const css = await readFile("styles.css", "utf8");
+  const reduced = css.slice(css.indexOf("@media (prefers-reduced-motion: reduce)"));
+  for (const target of ["\\.celestial-star", ">\\s*\\.capsule-letter"]) {
+    const open = `\\.eternal-letter\\[open\\]\\s+${target}`;
+    const manual = cssBlock(css, new RegExp(`:root\\[data-motion-paused="true"\\]\\s+${open}\\s*[,\\{]`));
+    const preference = cssBlock(reduced, new RegExp(`${open}\\s*[,\\{]`));
+    for (const block of [manual, preference]) {
+      assert.match(block, /\banimation:\s*none\s*;/, "opt-out must cancel an in-progress effect");
+      assert.doesNotMatch(block, /animation-play-state:\s*paused/);
+    }
+  }
+});
+
 async function validateFixture({
   indexHtml,
   scriptSource,
