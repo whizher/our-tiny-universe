@@ -98,6 +98,12 @@ browser restoration may retain its open state; the application does not save or
 reset it. Capsule disclosures are independent of the timeline's exclusive group.
 There is no forced scrolling, focus movement, automatic opening or audio action.
 
+The Phase 2B.1 Celestial Letter Reveal adds a brief 480ms gold/lavender halo and a
+300ms fade with a 5px upward reveal when the letter opens. The star stays still;
+closing is immediate. Reduced motion or manual Pause motion cancels both effects
+and shows the resting letter immediately. Reopening or re-enabling motion while
+already open may replay the one-shot effects. This enhancement uses CSS only.
+
 The permanent letter is available every day. July 7 in Asia/Pontianak adds only
 a short anniversary invitation and a warmer static accent. July 8 removes only
 those seasonal elements. Calendar-year counts use the existing July 7, 2024 start.

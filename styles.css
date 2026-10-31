@@ -677,6 +677,10 @@ button:focus-visible {
   filter: drop-shadow(0 0 0.8rem rgba(188, 156, 255, 0.45));
 }
 
+.eternal-letter[open] .celestial-star {
+  animation: celestial-halo 480ms ease-out;
+}
+
 .anniversary-capsule[data-celebrating="true"] .eternal-letter {
   border-color: var(--gold);
   background: rgba(255, 213, 106, 0.06);
@@ -699,6 +703,10 @@ button:focus-visible {
   scroll-margin-block: 1rem 9rem;
 }
 
+.eternal-letter[open] > .capsule-letter {
+  animation: celestial-letter-reveal 300ms cubic-bezier(0.2, 0.6, 0.3, 1);
+}
+
 .capsule-letter h3 {
   color: var(--gold);
   font-size: 1.25rem;
@@ -711,6 +719,35 @@ button:focus-visible {
 
 :root[data-motion-paused="true"] .anniversary-capsule details {
   transition: none;
+}
+
+:root[data-motion-paused="true"] .eternal-letter[open] .celestial-star,
+:root[data-motion-paused="true"] .eternal-letter[open] > .capsule-letter {
+  animation: none;
+}
+
+@keyframes celestial-halo {
+  from,
+  to {
+    filter: drop-shadow(0 0 0.8rem rgba(188, 156, 255, 0.45));
+  }
+
+  40% {
+    filter: drop-shadow(0 0 0.85rem rgba(255, 213, 106, 0.45))
+      drop-shadow(0 0 1rem rgba(188, 156, 255, 0.35));
+  }
+}
+
+@keyframes celestial-letter-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @keyframes orbit {
@@ -802,6 +839,11 @@ button:focus-visible {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .eternal-letter[open] .celestial-star,
+  .eternal-letter[open] > .capsule-letter {
+    animation: none;
+  }
+
   .anniversary-capsule details {
     transition: none;
   }
